@@ -1,8 +1,8 @@
 /**
  * Stable machine-readable error codes — the FE switches on these.
  *
- * Per docs/05-api-documentation.md §5.4: every 4xx/5xx body uses the envelope
- *   { error: { code, message, details? } }
+ * Envelope contract (`{ error: { code, message, details? } }`) is defined
+ * in docs/05-api-documentation.md §5.1 and docs/02-system-architecture.md §2.5.
  *
  * Add new codes here ONLY. Renames are breaking changes and require a contract PR.
  */
@@ -16,6 +16,7 @@ export const ErrorCode = {
   INVALID_INTERNAL_KEY: 'INVALID_INTERNAL_KEY',
 
   // Validation / request shape
+  BAD_REQUEST: 'BAD_REQUEST',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
   UNSUPPORTED_MEDIA_TYPE: 'UNSUPPORTED_MEDIA_TYPE',

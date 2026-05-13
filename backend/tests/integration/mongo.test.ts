@@ -5,8 +5,11 @@
  * verifies connect / ping / disconnect, and that the readyz probe
  * flips green when the connection is live.
  *
- * Skipped automatically in environments without the binary (CI must run
- * a Mongo image; mongodb-memory-server downloads on first run otherwise).
+ * Run prerequisite: mongodb-memory-server downloads its Mongo binary on first
+ * use (cached under ~/.cache/mongodb-binaries). CI must either pre-warm that
+ * cache or allow network egress during the first run. This test does NOT
+ * conditionally skip — it will fail loudly if the binary can't be fetched, so
+ * we never silently lose integration coverage.
  */
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import request from 'supertest';

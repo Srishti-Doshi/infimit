@@ -52,6 +52,10 @@ export class ApiError extends Error {
     return new ApiError(404, ErrorCode.NOT_FOUND, message, { details });
   }
 
+  static badRequest(message = 'Bad request', details?: unknown): ApiError {
+    return new ApiError(400, ErrorCode.BAD_REQUEST, message, { details });
+  }
+
   static validation(message = 'Invalid request', details?: unknown): ApiError {
     return new ApiError(422, ErrorCode.VALIDATION_ERROR, message, { details });
   }

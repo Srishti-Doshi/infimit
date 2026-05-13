@@ -5,7 +5,10 @@
  * - ZodError → 422 VALIDATION_ERROR with flattened issues (defense-in-depth;
  *              validate() middleware should catch first)
  * - Mongoose ValidationError → 422 VALIDATION_ERROR
- * - Mongoose CastError → 400 VALIDATION_ERROR ("invalid id")
+ * - Mongoose CastError → 422 VALIDATION_ERROR ("invalid <path>")
+ *   (Routed through ApiError.validation for envelope consistency. If the
+ *    contract ever needs 400 BAD_REQUEST for malformed-id cases, switch this
+ *    branch only — call sites won't change.)
  * - duplicate key (E11000) → 409 CONFLICT
  * - anything else → 500 INTERNAL_ERROR (message scrubbed in non-dev)
  *

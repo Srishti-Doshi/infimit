@@ -8,6 +8,7 @@
  */
 import cors from 'cors';
 import { loadEnv } from '@/config/env';
+import { ApiError } from '@/shared/errors';
 
 const env = loadEnv();
 
@@ -21,7 +22,9 @@ export const corsMiddleware = cors({
     if (env.NODE_ENV === 'development' && origin.startsWith('http://localhost')) {
       return callback(null, true);
     }
-    return callback(new Error(`CORS: origin ${origin} not allowed`));
+    // Forward as ApiError so the global errorHandler emits the standard 403
+    // envelope instead of a generic 500 INTERNAL_ERROR.
+    return callback(ApiError.forbidden(`CORS: origin ${origin} not allowed`));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
