@@ -10,13 +10,13 @@ import IORedis, { type Redis } from 'ioredis';
 import { loadEnv } from './env';
 import { logger } from './logger';
 
-const env = loadEnv();
-
 const MAX_RETRY_DELAY_MS = 10_000;
 
 let client: Redis | null = null;
 
 function createClient(): Redis {
+  // Read env at client-creation time so tests can override REDIS_URL.
+  const env = loadEnv();
   const r = new IORedis(env.REDIS_URL, {
     keyPrefix: env.REDIS_KEY_PREFIX,
     lazyConnect: true,

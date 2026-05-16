@@ -19,7 +19,12 @@ export class ApiError extends Error {
   public readonly details?: unknown;
   public readonly isOperational: boolean = true;
 
-  constructor(statusCode: number, code: ErrorCodeValue, message: string, options: ApiErrorOptions = {}) {
+  constructor(
+    statusCode: number,
+    code: ErrorCodeValue,
+    message: string,
+    options: ApiErrorOptions = {},
+  ) {
     super(message);
     this.name = 'ApiError';
     this.statusCode = statusCode;
@@ -64,7 +69,10 @@ export class ApiError extends Error {
     return new ApiError(409, ErrorCode.CONFLICT, message, { details });
   }
 
-  static invalidState(message = 'Operation not allowed in current state', details?: unknown): ApiError {
+  static invalidState(
+    message = 'Operation not allowed in current state',
+    details?: unknown,
+  ): ApiError {
     return new ApiError(409, ErrorCode.INVALID_STATE, message, { details });
   }
 

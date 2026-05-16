@@ -52,7 +52,10 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       details: err.keyValue,
     });
   } else {
-    const message = env.NODE_ENV === 'production' ? 'Internal server error' : (err as Error)?.message ?? 'Unknown error';
+    const message =
+      env.NODE_ENV === 'production'
+        ? 'Internal server error'
+        : ((err as Error)?.message ?? 'Unknown error');
     apiErr = ApiError.internal(message);
   }
 
@@ -60,7 +63,10 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   if (apiErr.statusCode >= 500) {
     log.error({ err, requestId: req.requestId, code: apiErr.code }, 'unhandled_error');
   } else if (apiErr.statusCode >= 400) {
-    log.warn({ err: { message: apiErr.message, code: apiErr.code }, requestId: req.requestId }, 'request_failed');
+    log.warn(
+      { err: { message: apiErr.message, code: apiErr.code }, requestId: req.requestId },
+      'request_failed',
+    );
   }
 
   res.status(apiErr.statusCode).json({

@@ -86,8 +86,7 @@ describe('Subphase 1 smoke tests', () => {
       ['GET', '/v1/search'],
     ])('%s %s returns 501 with envelope', async (method, path) => {
       const req = request(app);
-      const res =
-        method === 'POST' ? await req.post(path).send({}) : await req.get(path);
+      const res = method === 'POST' ? await req.post(path).send({}) : await req.get(path);
       expect(res.status).toBe(501);
       expect(res.body.error.code).toBe('INTERNAL_ERROR');
       expect(res.body.error.message).toMatch(/Subphase|Phase/);

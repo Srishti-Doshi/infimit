@@ -1,0 +1,100 @@
+# ---------------------------------------------------------------
+# Infimit backend CI
+#
+# Runs on every PR and every push to `main` that touches backend/ or this
+# workflow file. Cancels in-flight runs when a newer commit lands on the same
+# ref (saves Actions minutes on rapid-fire pushes).
+#
+# Gates enforced:
+#   1. Install      — npm ci (requires committed package-lock.json)
+#   2. Typecheck    — tsc --noEmit, strict mode
+#   3. Lint         — ESLint over src/ + tests/
+#   4. Format       — Prettier check (read-only; auto-fix locally with npm run format)
+#   5. Tests        — Jest, including the mongodb-memory-server integration test.
+#                     The Mongo binary is cached so first-run download (~80 MB)
+#                     only happens when the lockfile changes.
+#   6. Build        — tsc + tsc-alias. Verifies the production bundle is producible
+#                     and that path aliases rewrite cleanly (catches the
+#                     `@/config/*` regression class).
+#
+# Not yet included (deferred to follow-up PRs):
+#   - Docker image build
+#   - Live "boot + curl /healthz" smoke (needs job services for mongo + redis)
+#   - Frontend / AI-service jobs (modules not yet in the repo)
+# ---------------------------------------------------------------
+
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci.yml'
+
+# Cancel any superseded run for the same PR or branch.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Cache mongodb-memory-server binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: ${{ runner.os }}-mongo-mms-${{ hashFiles('backend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-mongo-mms-
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # Final guard against the path-alias regression: every file in dist/
+      # should have its imports rewritten by tsc-alias. If a stray '@/...'
+      # makes it into the bundle, the production runtime will fail.
+      - name: Verify no unresolved path aliases in build output
+        run: |
+          if grep -RE "require\(['\"]@/" dist/; then
+            echo "Found unresolved '@/' alias in compiled output — tsc-alias did not run."
+            exit 1
+          fi
+          echo "OK — no unresolved aliases."

@@ -56,6 +56,7 @@
     "prettier": "^3.3.2",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.2",
+    "ts-node": "^10.9.2",
     "tsc-alias": "^1.8.10",
     "tsx": "^4.16.2",
     "typescript": "^5.5.3"

@@ -13,8 +13,6 @@ import mongoose, { type Connection } from 'mongoose';
 import { loadEnv } from './env';
 import { logger } from './logger';
 
-const env = loadEnv();
-
 const RETRIES = 3;
 const BACKOFF_BASE_MS = 1_000;
 
@@ -26,12 +24,16 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Connect to MongoDB. Idempotent: subsequent calls return the live connection.
+ *
+ * Reads env at call time (not module load) so tests can mutate process.env
+ * (e.g. point at an in-memory MongoDB) + resetEnvForTests() before connecting.
  */
 export async function connectMongo(): Promise<Connection> {
   if (connection && connection.readyState === 1) {
     return connection;
   }
 
+  const env = loadEnv();
   mongoose.set('strictQuery', true);
 
   for (let attempt = 1; attempt <= RETRIES; attempt += 1) {

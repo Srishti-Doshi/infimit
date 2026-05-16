@@ -9,6 +9,6 @@ const router = Router();
 const todo = notImplemented('Subphase 3');
 
 router.get('/', todo);
-router.get('/suggest', todo);   // typeahead
+router.get('/suggest', todo); // typeahead
 
 export default router;

@@ -38,17 +38,17 @@ This is the Subphase 1 acceptance check: `mongo + redis + backend` should all be
 
 ## Scripts
 
-| Command              | Purpose                                                  |
-| -------------------- | -------------------------------------------------------- |
-| `npm run dev`        | Watch mode (tsx).                                        |
-| `npm run build`      | Compile to `dist/`.                                      |
-| `npm start`          | Run the compiled output.                                 |
-| `npm run typecheck`  | `tsc --noEmit`.                                          |
-| `npm run lint`       | ESLint over `src/` and `tests/`.                         |
-| `npm run lint:fix`   | Same + auto-fix.                                         |
-| `npm run format`     | Prettier write.                                          |
-| `npm test`           | Jest (smoke + unit). Integration tests run serially.     |
-| `npm run test:coverage` | Coverage report into `coverage/`.                     |
+| Command                 | Purpose                                              |
+| ----------------------- | ---------------------------------------------------- |
+| `npm run dev`           | Watch mode (tsx).                                    |
+| `npm run build`         | Compile to `dist/`.                                  |
+| `npm start`             | Run the compiled output.                             |
+| `npm run typecheck`     | `tsc --noEmit`.                                      |
+| `npm run lint`          | ESLint over `src/` and `tests/`.                     |
+| `npm run lint:fix`      | Same + auto-fix.                                     |
+| `npm run format`        | Prettier write.                                      |
+| `npm test`              | Jest (smoke + unit). Integration tests run serially. |
+| `npm run test:coverage` | Coverage report into `coverage/`.                    |
 
 ## Folder layout
 
@@ -90,7 +90,7 @@ All 4xx / 5xx responses share this shape (docs/05-api-documentation.md §5.4):
 
 ```json
 {
-  "error": { "code": "VALIDATION_ERROR", "message": "...", "details": { } },
+  "error": { "code": "VALIDATION_ERROR", "message": "...", "details": {} },
   "requestId": "8f6c8b4c-..."
 }
 ```
@@ -99,11 +99,11 @@ Throw via `ApiError` static helpers in `src/shared/errors`. The global `errorHan
 
 ## Health probes
 
-| Route       | Purpose                                                                 |
-| ----------- | ----------------------------------------------------------------------- |
-| `/healthz`  | Liveness — always 200 if process is up. Used by orchestrator liveness. |
-| `/readyz`   | Readiness — 200 only when Mongo + Redis are reachable.                  |
-| `/version`  | Build/runtime info (name, version, env, uptime).                        |
+| Route      | Purpose                                                                |
+| ---------- | ---------------------------------------------------------------------- |
+| `/healthz` | Liveness — always 200 if process is up. Used by orchestrator liveness. |
+| `/readyz`  | Readiness — 200 only when Mongo + Redis are reachable.                 |
+| `/version` | Build/runtime info (name, version, env, uptime).                       |
 
 ## What's next
 
