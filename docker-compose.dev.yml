@@ -1,0 +1,77 @@
+# ---------------------------------------------------------------
+# Infimit dev compose — Subphase 1 surface.
+#
+# Brings up:
+#   - mongo      (5.0+, single-node, no auth — dev only)
+#   - redis      (7+)
+#   - backend    (built from ./backend/Dockerfile)
+#
+# Subphase 1 deliverable: `docker compose -f docker-compose.dev.yml up backend`
+# must succeed end-to-end with /healthz returning 200.
+#
+# AI service and frontend will be added in later subphases.
+# ---------------------------------------------------------------
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: infimit-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: infimit-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: infimit-backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: "4000"
+      LOG_LEVEL: debug
+      SERVICE_NAME: infimit-backend
+      CORS_ORIGINS: "http://localhost:5173"
+      MONGO_URI: "mongodb://mongo:27017/infimit"
+      REDIS_URL: "redis://redis:6379"
+      JWT_ACCESS_SECRET: "dev-access-secret-please-replace-32chars-min"
+      JWT_REFRESH_SECRET: "dev-refresh-secret-please-replace-32chars-min"
+      AI_SERVICE_URL: "http://ai-service:8000"
+      AI_INTERNAL_KEY: "dev-internal-key"
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongo_data:
+  redis_data:
