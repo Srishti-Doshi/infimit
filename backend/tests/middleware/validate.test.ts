@@ -9,10 +9,8 @@ function makeApp() {
   const app = express();
   app.use(express.json());
   app.use(requestId);
-  app.post(
-    '/echo',
-    validate({ body: z.object({ name: z.string().min(2) }) }),
-    (req, res) => res.json({ name: req.body.name }),
+  app.post('/echo', validate({ body: z.object({ name: z.string().min(2) }) }), (req, res) =>
+    res.json({ name: req.body.name }),
   );
   app.use(errorHandler);
   return app;

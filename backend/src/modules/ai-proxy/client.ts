@@ -11,7 +11,7 @@
  */
 
 export interface SummarizeOptions {
-  maxWords?: number;          // 20..120
+  maxWords?: number; // 20..120
   style?: 'neutral' | 'engaging' | 'academic';
 }
 

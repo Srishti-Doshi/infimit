@@ -10,8 +10,8 @@ const todo = notImplemented('Subphase 2');
 
 router.get('/', todo);
 router.get('/:id', todo);
-router.post('/', todo);            // admin
+router.post('/', todo); // admin
 router.patch('/:id', todo);
-router.delete('/:id', todo);       // admin
+router.delete('/:id', todo); // admin
 
 export default router;

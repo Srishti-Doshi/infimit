@@ -8,10 +8,10 @@ import { notImplemented } from '@/modules/_shared/notImplemented';
 const router = Router();
 const todo = notImplemented('Subphase 2');
 
-router.get('/', todo);            // admin-only listing
+router.get('/', todo); // admin-only listing
 router.get('/:id', todo);
 router.patch('/me', todo);
-router.patch('/:id/role', todo);  // admin
+router.patch('/:id/role', todo); // admin
 router.post('/me/avatar', todo);
 
 export default router;

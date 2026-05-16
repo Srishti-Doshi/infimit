@@ -11,7 +11,7 @@ const todo = notImplemented('Subphase 4');
 router.get('/', todo);
 router.get('/:id', todo);
 router.get('/:id/download', todo);
-router.post('/', todo);          // admin
-router.delete('/:id', todo);     // admin
+router.post('/', todo); // admin
+router.delete('/:id', todo); // admin
 
 export default router;
