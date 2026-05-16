@@ -21,10 +21,16 @@ function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb);
 }
 
-export const requireInternalKey: RequestHandler = (req: Request, _res: Response, next: NextFunction) => {
+export const requireInternalKey: RequestHandler = (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+) => {
   const presented = req.header('x-internal-key');
   if (!presented || !safeEqual(presented, env.AI_INTERNAL_KEY)) {
-    return next(new ApiError(401, ErrorCode.INVALID_INTERNAL_KEY, 'Invalid or missing X-Internal-Key'));
+    return next(
+      new ApiError(401, ErrorCode.INVALID_INTERNAL_KEY, 'Invalid or missing X-Internal-Key'),
+    );
   }
   next();
 };

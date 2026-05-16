@@ -11,6 +11,6 @@ const todo = notImplemented('Subphase 5');
 router.post('/track', todo);
 router.get('/articles/:id', todo);
 router.get('/authors/:id', todo);
-router.get('/platform', todo);   // admin
+router.get('/platform', todo); // admin
 
 export default router;

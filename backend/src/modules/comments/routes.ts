@@ -15,11 +15,11 @@ const router = Router();
 const todo = notImplemented('Subphase 4');
 
 // Article-scoped routes (mounted at /articles/:articleId/comments by parent router)
-router.get('/', todo);          // public — approved
-router.post('/', todo);         // reader+
+router.get('/', todo); // public — approved
+router.post('/', todo); // reader+
 
 // Standalone moderation routes (mounted at /comments)
-router.get('/pending', todo);   // editor/admin
+router.get('/pending', todo); // editor/admin
 router.post('/:id/approve', todo);
 router.post('/:id/reject', todo);
 router.post('/:id/hide', todo);

@@ -45,7 +45,10 @@ export const events = {
     emitter.emit(name, payload);
   },
 
-  on<E extends DomainEventName>(name: E, handler: (payload: DomainEventPayloads[E]) => void | Promise<void>): void {
+  on<E extends DomainEventName>(
+    name: E,
+    handler: (payload: DomainEventPayloads[E]) => void | Promise<void>,
+  ): void {
     emitter.on(name, (payload) => {
       Promise.resolve(handler(payload as DomainEventPayloads[E])).catch((err) => {
         logger.error({ err, event: name }, 'event_handler_failed');
