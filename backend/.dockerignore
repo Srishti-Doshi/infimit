@@ -1,0 +1,17 @@
+node_modules
+dist
+coverage
+.tsbuildinfo
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.husky
+tests
+**/*.test.ts
+README.md
+.eslintrc.cjs
+.prettierrc
+.prettierignore
+.eslintignore
