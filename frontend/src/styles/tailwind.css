@@ -1,0 +1,116 @@
+/**
+ * Infimit design tokens + Tailwind base layer.
+ *
+ * Token strategy:
+ *  - All colors live as CSS variables holding raw `R G B` triples (no hex).
+ *    Tailwind utilities reference them via `rgb(var(--token) / <alpha-value>)`
+ *    so utilities like `bg-brand-red-500/50` produce proper alpha output.
+ *  - When dark mode lands in Phase 2, we redefine these same variables under
+ *    a `[data-theme="dark"]` (or `prefers-color-scheme`) selector. No
+ *    component code changes.
+ *  - Fonts are imported via @fontsource-variable packages — self-hosted,
+ *    one file per family, all weights available via the variable axis.
+ */
+
+@import '@fontsource-variable/fraunces';
+@import '@fontsource-variable/inter';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Brand red — primary accent for CTAs, links, status emphasis */
+    --brand-red-50: 254 242 242;
+    --brand-red-100: 254 226 226;
+    --brand-red-500: 220 38 38;
+    --brand-red-600: 185 28 28;
+    --brand-red-700: 153 27 27;
+
+    /* Ink — text colors, semantic hierarchy */
+    --ink-primary: 15 15 16;
+    --ink-secondary: 75 85 99;
+    --ink-tertiary: 156 163 175;
+    --ink-inverse: 255 255 255;
+
+    /* Surface — page and card backgrounds */
+    --surface-default: 255 255 255;
+    --surface-subtle: 249 250 251;
+    --surface-rose-tint: 255 241 242;
+    --surface-blue-tint: 239 246 255;
+    --surface-inverse: 15 15 16;
+
+    /* Lines — borders and dividers (named `line` not `border` to avoid colliding with Tailwind's border-color utility namespace) */
+    --line-default: 229 231 235;
+    --line-strong: 209 213 219;
+
+    /* Status — color-coded states (Accepted/Pending/Rejected/Info) */
+    --status-success-bg: 209 250 229;
+    --status-success-text: 6 95 70;
+    --status-warning-bg: 254 243 199;
+    --status-warning-text: 146 64 14;
+    --status-error-bg: 254 226 226;
+    --status-error-text: 153 27 27;
+    --status-info-bg: 219 234 254;
+    --status-info-text: 30 64 175;
+  }
+
+  /* Box sizing reset */
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: rgb(var(--surface-default));
+    color: rgb(var(--ink-primary));
+    font-family: theme('fontFamily.sans');
+    font-size: theme('fontSize.body-base[0]');
+    line-height: theme('fontSize.body-base[1].lineHeight');
+    /* Inter's stylistic alternates — better digit rendering, refined punctuation */
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: theme('fontFamily.display');
+    color: rgb(var(--ink-primary));
+    margin: 0;
+    font-weight: 600;
+  }
+
+  /* Focus rings — visible on keyboard nav, accent-red, never `outline: none` */
+  :focus-visible {
+    outline: 2px solid rgb(var(--brand-red-500));
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Honor users who request reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

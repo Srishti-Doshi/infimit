@@ -1,15 +1,17 @@
 # ---------------------------------------------------------------
-# Infimit dev compose — Subphase 1 surface.
+# Infimit dev compose — Subphase 1 surface (backend + frontend).
 #
 # Brings up:
-#   - mongo      (5.0+, single-node, no auth — dev only)
+#   - mongo      (single-node, no auth — dev only)
 #   - redis      (7+)
-#   - backend    (built from ./backend/Dockerfile)
+#   - backend    (./backend/Dockerfile)
+#   - frontend   (./frontend/Dockerfile — nginx serving the Vite build)
 #
-# Subphase 1 deliverable: `docker compose -f docker-compose.dev.yml up backend`
-# must succeed end-to-end with /healthz returning 200.
+# Subphase 1 deliverable per Frontend_Handler_Documentation.md:
+#   `docker compose -f docker-compose.dev.yml up` brings up all four services
+#   and the SPA is reachable at http://localhost:5173.
 #
-# AI service and frontend will be added in later subphases.
+# AI service is added in later subphases.
 # ---------------------------------------------------------------
 
 services:
@@ -71,6 +73,24 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Container talks to the backend via the docker network hostname,
+        # but browsers loading the SPA call the host-mapped port on localhost.
+        VITE_API_BASE_URL: "http://localhost:4000/v1"
+    container_name: infimit-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5173/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   mongo_data:
