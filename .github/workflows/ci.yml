@@ -1,26 +1,13 @@
 # ---------------------------------------------------------------
-# Infimit backend CI
+# Infimit CI — backend + frontend
 #
-# Runs on every PR and every push to `main` that touches backend/ or this
-# workflow file. Cancels in-flight runs when a newer commit lands on the same
-# ref (saves Actions minutes on rapid-fire pushes).
+# Two parallel jobs share the same workflow:
+#   - `backend`  → typecheck / lint / format / test / build
+#   - `frontend` → typecheck / lint / format / test / build
 #
-# Gates enforced:
-#   1. Install      — npm ci (requires committed package-lock.json)
-#   2. Typecheck    — tsc --noEmit, strict mode
-#   3. Lint         — ESLint over src/ + tests/
-#   4. Format       — Prettier check (read-only; auto-fix locally with npm run format)
-#   5. Tests        — Jest, including the mongodb-memory-server integration test.
-#                     The Mongo binary is cached so first-run download (~80 MB)
-#                     only happens when the lockfile changes.
-#   6. Build        — tsc + tsc-alias. Verifies the production bundle is producible
-#                     and that path aliases rewrite cleanly (catches the
-#                     `@/config/*` regression class).
-#
-# Not yet included (deferred to follow-up PRs):
-#   - Docker image build
-#   - Live "boot + curl /healthz" smoke (needs job services for mongo + redis)
-#   - Frontend / AI-service jobs (modules not yet in the repo)
+# Each job uses its own lockfile-keyed npm cache and only runs when its
+# files change (or when the workflow file itself changes). Concurrency
+# cancellation prevents wasted minutes on rapid-fire pushes.
 # ---------------------------------------------------------------
 
 name: CI
@@ -29,11 +16,13 @@ on:
   pull_request:
     paths:
       - 'backend/**'
+      - 'frontend/**'
       - '.github/workflows/ci.yml'
   push:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'frontend/**'
       - '.github/workflows/ci.yml'
 
 # Cancel any superseded run for the same PR or branch.
@@ -42,6 +31,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ─── Backend ─────────────────────────────────────────────────────────
   backend:
     name: Backend checks
     runs-on: ubuntu-latest
@@ -98,3 +88,51 @@ jobs:
             exit 1
           fi
           echo "OK — no unresolved aliases."
+
+  # ─── Frontend ────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # Confirm the production bundle is producible and dist/ has emitted assets.
+      # Vite emits content-hashed JS/CSS — if dist/ is empty or has no index.html,
+      # the build silently failed.
+      - name: Verify dist artifacts emitted
+        run: |
+          test -f dist/index.html
+          test -d dist/assets
+          echo "OK — dist/index.html and dist/assets present."

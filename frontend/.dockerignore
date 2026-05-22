@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+.env
+.env.*
+!.env.example
+.git
+.github
+.husky
+.vscode
+.idea
+*.log
+.DS_Store
+.vite
+.tsbuildinfo
+README.md

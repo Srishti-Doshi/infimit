@@ -1,0 +1,27 @@
+# Repo-root .gitignore — defends against accidental commits in the wrong directory.
+# Each package (backend/, frontend/) has its own .gitignore for package-scoped concerns.
+
+# Stray dependency artifacts at the repo root — should NEVER exist since no root package.json
+/node_modules
+/package-lock.json
+/package.json
+/yarn.lock
+/pnpm-lock.yaml
+
+# Build outputs accidentally produced at root
+/dist
+/build
+/coverage
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log
+.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Local env files
+/.env
+/.env.*
