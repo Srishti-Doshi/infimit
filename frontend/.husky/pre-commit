@@ -1,0 +1,14 @@
+# Monorepo pre-commit hook (dual-aware).
+#
+# Runs lint-staged in each package that has staged changes. Both backend/.husky/
+# and frontend/.husky/ should hold the same script content, so commits work
+# regardless of which package last ran `husky install`. If only one of the two
+# packages has dependencies installed, the other is skipped silently.
+
+if git diff --cached --name-only --diff-filter=ACM | grep -q '^backend/' && [ -d backend/node_modules ]; then
+  (cd backend && npx lint-staged) || exit 1
+fi
+
+if git diff --cached --name-only --diff-filter=ACM | grep -q '^frontend/' && [ -d frontend/node_modules ]; then
+  (cd frontend && npx lint-staged) || exit 1
+fi
