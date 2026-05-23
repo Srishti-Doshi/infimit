@@ -3,7 +3,7 @@ export { requestLogger } from './requestLogger';
 export { errorHandler } from './errorHandler';
 export { notFound } from './notFound';
 export { validate, type ValidationSchemas } from './validate';
-export { buildLimiter, globalLimiter } from './rateLimit';
+export { authLimiter, buildLimiter, globalLimiter } from './rateLimit';
 export { requireAuth } from './authGuard';
 export { requireRole } from './roleGuard';
 export { requireInternalKey } from './internalKey';

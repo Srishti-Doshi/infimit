@@ -49,3 +49,14 @@ export const globalLimiter = buildLimiter({
   windowMs: env.RATE_LIMIT_GLOBAL_WINDOW_MS,
   max: env.RATE_LIMIT_GLOBAL_MAX,
 });
+
+/**
+ * Per-IP limiter for the /auth/* router. 10 req/min/IP per docs §5.17.
+ * This is the OUTER layer of defence — caps the script rate. The INNER layer
+ * (per-account brute-force counter in `auth/brute-force.ts`) defeats
+ * credential-stuffing from IP-rotated attacks.
+ */
+export const authLimiter = buildLimiter({
+  windowMs: 60_000,
+  max: 10,
+});

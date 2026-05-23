@@ -22,9 +22,10 @@
  * Ambient declarations under src/shared/types/*.d.ts are picked up automatically
  * via tsconfig "include" — no runtime import needed.
  */
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
-import compression from 'compression';
 
 import {
   corsMiddleware,
@@ -50,6 +51,7 @@ export function createApp(): Express {
   app.use(helmet());
   app.use(corsMiddleware);
   app.use(compression());
+  app.use(cookieParser());
 
   app.use(globalLimiter);
 

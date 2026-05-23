@@ -72,6 +72,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-mongo-mms-
 
+      # Real PEMs are gitignored; tests need them to sign RS256 tokens.
+      # Production environments inject keys via a secrets manager — this
+      # step only mints throwaway dev keypairs for the CI run.
+      - name: Generate JWT dev keypairs
+        run: npx tsx scripts/generate-keys.ts
+
       - name: Test
         run: npm test
 
