@@ -38,11 +38,16 @@ const EnvSchema = z.object({
   REDIS_URL: z.string().min(1, 'REDIS_URL is required'),
   REDIS_KEY_PREFIX: z.string().default('infimit:'),
 
-  // JWT — required as strings; secrets validated for non-trivial length in non-dev
-  JWT_ACCESS_SECRET: z.string().min(8),
-  JWT_REFRESH_SECRET: z.string().min(8),
+  // JWT — Subphase 2+ uses RS256 (asymmetric) per docs/10-security.md §10.2.
+  // The env vars are PATHS to the PEM files; the JWT helper (shared/crypto/jwt.ts)
+  // reads them at boot via loadJwtKeys(). Run `npx tsx scripts/generate-keys.ts`
+  // once to materialise the dev keypair files.
+  JWT_ACCESS_PRIVATE_KEY_PATH: z.string().default('./keys/access-private.pem'),
+  JWT_ACCESS_PUBLIC_KEY_PATH: z.string().default('./keys/access-public.pem'),
+  JWT_REFRESH_PRIVATE_KEY_PATH: z.string().default('./keys/refresh-private.pem'),
+  JWT_REFRESH_PUBLIC_KEY_PATH: z.string().default('./keys/refresh-public.pem'),
   JWT_ACCESS_TTL: z.string().default('15m'),
-  JWT_REFRESH_TTL: z.string().default('7d'),
+  JWT_REFRESH_TTL: z.string().default('30d'),
 
   // AI service
   AI_SERVICE_URL: z.string().url().default('http://localhost:8000'),
@@ -87,9 +92,9 @@ export function loadEnv(): Env {
   }
 
   if (parsed.data.NODE_ENV === 'production') {
-    if (parsed.data.JWT_ACCESS_SECRET.length < 32 || parsed.data.JWT_REFRESH_SECRET.length < 32) {
-      throw new Error('JWT secrets must be ≥ 32 chars in production');
-    }
+    // Defensive checks for prod-only invariants. JWT key files are validated
+    // by loadJwtKeys() at boot (it'll throw if any path is unreadable) — env
+    // only verifies the paths are configured.
     if (parsed.data.AI_INTERNAL_KEY === 'dev-internal-key') {
       throw new Error('AI_INTERNAL_KEY must not be the default in production');
     }

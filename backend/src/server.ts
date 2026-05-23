@@ -17,6 +17,7 @@ import { loadEnv } from '@/config/env';
 import { logger } from '@/config/logger';
 import { connectMongo, disconnectMongo } from '@/config/db';
 import { connectRedis, disconnectRedis } from '@/config/redis';
+import { loadJwtKeys } from '@/shared/crypto';
 import { createApp } from './app';
 
 const SHUTDOWN_GRACE_MS = 10_000;
@@ -25,6 +26,10 @@ async function bootstrap(): Promise<void> {
   const env = loadEnv();
 
   logger.info({ env: env.NODE_ENV, port: env.PORT }, 'boot_start');
+
+  // Load RS256 keypairs before anything that might sign/verify JWTs. Failure
+  // here aborts boot — better than a 500 on the first auth request.
+  loadJwtKeys();
 
   await connectMongo();
   await connectRedis();

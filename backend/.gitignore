@@ -6,6 +6,10 @@ coverage
 .env
 .env.*
 !.env.example
+# RS256 JWT keys — generated locally via `npx tsx scripts/generate-keys.ts`.
+# Never committed; in prod they come from a secrets manager.
+keys/
+*.pem
 .DS_Store
 .idea
 .vscode/*

@@ -5,7 +5,7 @@
  *  - rejects missing required vars
  *  - coerces numeric strings (PORT)
  *  - parses comma-separated CORS_ORIGINS into an array
- *  - rejects short JWT secrets in production
+ *  - rejects default AI_INTERNAL_KEY in production
  */
 import { loadEnv, resetEnvForTests } from '../../src/config/env';
 
@@ -40,10 +40,9 @@ describe('config/env', () => {
     expect(typeof env.PORT).toBe('number');
   });
 
-  it('rejects short JWT secrets in production', () => {
+  it('rejects the default AI_INTERNAL_KEY in production', () => {
     process.env.NODE_ENV = 'production';
-    process.env.JWT_ACCESS_SECRET = 'short';
-    process.env.JWT_REFRESH_SECRET = 'short';
+    process.env.AI_INTERNAL_KEY = 'dev-internal-key';
     expect(() => loadEnv()).toThrow();
   });
 });

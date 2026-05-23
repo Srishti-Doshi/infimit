@@ -10,8 +10,9 @@ process.env.PORT = '4001';
 process.env.LOG_LEVEL = 'warn';
 process.env.MONGO_URI = process.env.MONGO_URI ?? 'mongodb://localhost:27017/infimit_test';
 process.env.REDIS_URL = process.env.REDIS_URL ?? 'redis://localhost:6379';
-process.env.JWT_ACCESS_SECRET = 'test-access-secret-32chars-minimum-aaaaa';
-process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-32chars-minimum-aaaa';
+// JWT_*_KEY_PATH defaults in env.ts already point at ./keys/*.pem; the tests
+// that need real signing call loadJwtKeys() against those files (which CI
+// generates via the prebuild step). Override here if a test needs different paths.
 process.env.AI_SERVICE_URL = 'http://localhost:8000';
 process.env.AI_INTERNAL_KEY = 'test-internal-key';
 process.env.CORS_ORIGINS = 'http://localhost:5173';
