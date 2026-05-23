@@ -8,6 +8,7 @@
  */
 import { Router } from 'express';
 
+import { authLimiter } from '@/middleware';
 import { authRoutes } from '@/modules/auth';
 import { userRoutes } from '@/modules/users';
 import { organisationRoutes } from '@/modules/organisations';
@@ -24,7 +25,7 @@ import { searchRoutes } from '@/modules/search';
 
 const apiV1 = Router();
 
-apiV1.use('/auth', authRoutes);
+apiV1.use('/auth', authLimiter, authRoutes);
 apiV1.use('/users', userRoutes);
 apiV1.use('/organisations', organisationRoutes);
 apiV1.use('/articles', articleRoutes);
