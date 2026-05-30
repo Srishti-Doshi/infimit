@@ -23,6 +23,7 @@
     "keys:generate": "tsx scripts/generate-keys.ts",
     "keys:rotate": "tsx scripts/generate-keys.ts --force",
     "seed": "tsx scripts/seed.ts",
+    "migrate": "tsx scripts/migrate.ts",
     "prepare": "cd .. && husky backend/.husky"
   },
   "dependencies": {
