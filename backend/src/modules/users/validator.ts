@@ -8,7 +8,10 @@ import { z } from 'zod';
 
 // Import directly from the validator file (not the auth barrel) — the barrel
 // also re-exports `authRoutes`, which transitively pulls users back, creating
-// a CJS cycle that crashes `tsx watch` at boot.
+// a CJS cycle that crashes `tsx watch` at boot. The repo's `no-restricted-imports`
+// rule normally forbids deep imports; this is the documented exception until the
+// auth barrel is split (routes vs schemas) in Subphase 3.
+// eslint-disable-next-line no-restricted-imports
 import { emailSchema, passwordSchema } from '@/modules/auth/validator';
 
 /**
