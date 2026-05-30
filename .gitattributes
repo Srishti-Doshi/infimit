@@ -1,0 +1,22 @@
+# Normalize line endings to LF for all text files.
+#
+# Every committed blob in this repo is already LF. Without this file,
+# core.autocrlf=true on a Windows checkout rewrites the working tree to CRLF,
+# which breaks Prettier (endOfLine: "lf") and surfaces phantom "modified" files.
+# Pinning eol=lf makes checkouts deterministic across machines and CI.
+* text=auto eol=lf
+
+# Binary assets git must never line-ending-convert.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.svg text
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.zip binary
