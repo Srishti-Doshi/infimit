@@ -1,9 +1,11 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom';
 
+import { RedirectIfAuthed, RequireAuth, RequireRole } from '@/components/auth-guards';
 import { AppLayout } from '@/components/layout';
 import { Spinner } from '@/components/ui';
 
+import ForbiddenPage from '@/pages/forbidden';
 import NotFoundPage from '@/pages/not-found';
 
 // Lazy-loaded route chunks — each becomes its own bundle so the entry chunk
@@ -17,11 +19,16 @@ const EpaperPage = lazy(() => import('@/pages/epaper'));
 const LoginPage = lazy(() => import('@/pages/auth/login'));
 const RegisterPage = lazy(() => import('@/pages/auth/register'));
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/forgot-password'));
+const ResetPasswordPage = lazy(() => import('@/pages/auth/reset-password'));
+const VerifyEmailPage = lazy(() => import('@/pages/auth/verify-email'));
 
+const ProfilePage = lazy(() => import('@/pages/dashboard/me'));
 const ReaderDashboardPage = lazy(() => import('@/pages/dashboard/reader'));
 const AuthorDashboardPage = lazy(() => import('@/pages/dashboard/author'));
 const EditorDashboardPage = lazy(() => import('@/pages/dashboard/editor'));
-const AdminDashboardPage = lazy(() => import('@/pages/dashboard/admin'));
+const AdminLandingPage = lazy(() => import('@/pages/dashboard/admin'));
+const AdminEditorsPage = lazy(() => import('@/pages/dashboard/admin/editors'));
+const AdminOrganisationsPage = lazy(() => import('@/pages/dashboard/admin/organisations'));
 
 function RouteFallback(): JSX.Element {
   return (
@@ -57,15 +64,47 @@ const router = createBrowserRouter(
         { path: 'search', element: <SearchPage /> },
         { path: 'epaper', element: <EpaperPage /> },
 
-        { path: 'auth/login', element: <LoginPage /> },
-        { path: 'auth/register', element: <RegisterPage /> },
+        // Guest-only auth pages: an authed user lands on their role-based
+        // dashboard instead. Password recovery + email verification stay
+        // accessible to everyone (authed users may also reset).
+        {
+          element: <RedirectIfAuthed />,
+          children: [
+            { path: 'auth/login', element: <LoginPage /> },
+            { path: 'auth/register', element: <RegisterPage /> },
+          ],
+        },
         { path: 'auth/forgot-password', element: <ForgotPasswordPage /> },
+        { path: 'auth/reset-password', element: <ResetPasswordPage /> },
+        { path: 'auth/verify-email', element: <VerifyEmailPage /> },
 
-        { path: 'dashboard/reader/*', element: <ReaderDashboardPage /> },
-        { path: 'dashboard/author/*', element: <AuthorDashboardPage /> },
-        { path: 'dashboard/editor/*', element: <EditorDashboardPage /> },
-        { path: 'dashboard/admin/*', element: <AdminDashboardPage /> },
+        // Authenticated routes. Inner RequireRole wrappers enforce role
+        // hierarchy (admin > editor > author > reader).
+        {
+          element: <RequireAuth />,
+          children: [
+            { path: 'dashboard/me', element: <ProfilePage /> },
+            { path: 'dashboard/reader/*', element: <ReaderDashboardPage /> },
+            {
+              element: <RequireRole roles={['author', 'editor', 'admin']} />,
+              children: [{ path: 'dashboard/author/*', element: <AuthorDashboardPage /> }],
+            },
+            {
+              element: <RequireRole roles={['editor', 'admin']} />,
+              children: [{ path: 'dashboard/editor/*', element: <EditorDashboardPage /> }],
+            },
+            {
+              element: <RequireRole roles={['admin']} />,
+              children: [
+                { path: 'dashboard/admin', element: <AdminLandingPage /> },
+                { path: 'dashboard/admin/editors', element: <AdminEditorsPage /> },
+                { path: 'dashboard/admin/organisations', element: <AdminOrganisationsPage /> },
+              ],
+            },
+          ],
+        },
 
+        { path: 'forbidden', element: <ForbiddenPage /> },
         { path: '*', element: <NotFoundPage /> },
       ],
     },

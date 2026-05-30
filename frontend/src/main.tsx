@@ -21,7 +21,9 @@ const queryClient = createQueryClient();
  * any component goes through the mocks — no flash of uncaught network call.
  */
 async function bootstrap(): Promise<void> {
-  if (import.meta.env.DEV && import.meta.env.VITE_USE_MOCK === 'true') {
+  // MSW is on by default in dev so the UI works without a backend.
+  // Set `VITE_USE_MOCK=false` in a local .env to hit the real backend instead.
+  if (import.meta.env.DEV && import.meta.env.VITE_USE_MOCK !== 'false') {
     const { worker } = await import('./mocks/browser');
     await worker.start({
       onUnhandledRequest: 'bypass',

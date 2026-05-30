@@ -53,6 +53,12 @@ export interface InputProps
   errorText?: string;
   iconLeft?: ReactNode;
   iconRight?: ReactNode;
+  /**
+   * Interactive trailing control (e.g. a password reveal button). Unlike
+   * `iconRight`, it is NOT wrapped in `aria-hidden`, so the affordance stays in
+   * the accessibility tree — pass a `<button>` with its own `aria-label`.
+   */
+  trailingAction?: ReactNode;
   containerClassName?: string;
 }
 
@@ -63,6 +69,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     errorText,
     iconLeft,
     iconRight,
+    trailingAction,
     variant,
     inputSize,
     disabled,
@@ -114,6 +121,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
             {iconRight}
           </span>
         ) : null}
+        {trailingAction ? <span className="inline-flex">{trailingAction}</span> : null}
       </div>
       {isError ? (
         <p id={errorId} className="text-body-xs text-brand-red-500">
