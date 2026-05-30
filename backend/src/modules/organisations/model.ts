@@ -48,6 +48,17 @@ const OrganisationSchema = new Schema<OrganisationDocument>(
   {
     timestamps: true,
     versionKey: false,
+    toJSON: {
+      virtuals: true,
+      transform(_doc, ret) {
+        const r = ret as Record<string, unknown>;
+        // FE-facing canonical id field — replaces Mongo's `_id`. Mirrors the
+        // User model transform; retires the FE's `normalizeId` shim.
+        r.id = r._id;
+        delete r._id;
+        return r;
+      },
+    },
   },
 );
 
