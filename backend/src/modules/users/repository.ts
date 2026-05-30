@@ -82,6 +82,26 @@ export async function countActiveBy(filter: FilterQuery<UserDocument>): Promise<
 }
 
 /**
+ * Editors whose `sectionsOwned` includes the given article category. Used by
+ * the articles module when a draft is submitted: every section-owning editor
+ * gets notified (Subphase 4 will wire the real notifications module; Subphase
+ * 3 just audit-logs the recipients).
+ *
+ * Editors with `sectionsOwned: []` are intentionally NOT returned — empty
+ * means "no scope yet"; an admin assigns sections explicitly.
+ */
+export async function findActiveEditorsForSection(category: string): Promise<UserModel[]> {
+  return User.find({
+    role: 'editor',
+    isActive: true,
+    deletedAt: null,
+    sectionsOwned: category,
+  })
+    .sort({ name: 1 })
+    .exec();
+}
+
+/**
  * Paginated active list for a given role. Used by:
  *   - listAuthors (public)
  *   - listEditors (admin)
