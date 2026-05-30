@@ -28,7 +28,15 @@ export const corsMiddleware = cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'X-Internal-Key'],
+  // `X-Requested-With` is required per Subphase 1 backend doc — the FE sends it
+  // as the CSRF-pair signal for the SameSite=Strict refresh cookie.
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Request-Id',
+    'X-Internal-Key',
+    'X-Requested-With',
+  ],
   exposedHeaders: ['X-Request-Id'],
   maxAge: 86_400,
 });
