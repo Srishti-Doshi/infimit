@@ -54,13 +54,26 @@ const EnvSchema = z.object({
   AI_INTERNAL_KEY: z.string().min(1).default('dev-internal-key'),
   AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
 
-  // S3 (optional in Subphase 1)
+  // S3 / object store — Subphase 3 wires presigned uploads.
+  // Dev/test point at MinIO via docker-compose.dev.yml (S3_FORCE_PATH_STYLE=true,
+  // root credentials minioadmin/minioadmin). Production points at real AWS S3.
+  // The client lives in config/s3.ts and is created lazily so missing creds in
+  // dev (when media features aren't being exercised) don't break boot.
   S3_ENDPOINT: z.string().optional().default(''),
   S3_REGION: z.string().default('us-east-1'),
   S3_BUCKET: z.string().default(''),
   S3_ACCESS_KEY: z.string().optional().default(''),
   S3_SECRET_KEY: z.string().optional().default(''),
   S3_PUBLIC_BASE_URL: z.string().optional().default(''),
+  // MinIO + LocalStack require path-style URLs; real AWS S3 uses virtual-host.
+  S3_FORCE_PATH_STYLE: z
+    .string()
+    .optional()
+    .default('false')
+    .transform((s) => s === 'true' || s === '1'),
+  // TTL for presigned PUT URLs. 300s matches the Subphase 3 doc default; tune
+  // if larger uploads outgrow this window.
+  S3_PRESIGN_TTL_SEC: z.coerce.number().int().positive().max(3600).default(300),
 
   // Rate limiting
   RATE_LIMIT_GLOBAL_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
