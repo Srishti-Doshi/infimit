@@ -77,10 +77,10 @@ describe('Subphase 1 smoke tests', () => {
   });
 
   describe('Skeleton modules', () => {
-    // /v1/auth/* and /v1/users/* and /v1/organisations/* are real as of Subphase 2.
-    // The rest are still skeletons until the modules ship in later subphases.
+    // Real as of Subphase 2: /v1/auth/*, /v1/users/*, /v1/organisations/*
+    // Real as of Subphase 3: /v1/articles/* (write surface), /v1/media/*
+    // The list below is endpoints that remain notImplemented skeletons.
     it.each([
-      ['POST', '/v1/articles'],
       ['GET', '/v1/articles/feed/home'],
       ['GET', '/v1/notifications'],
       ['POST', '/v1/analytics/track'],

@@ -83,11 +83,17 @@ const UserSchema = new Schema<UserDocument>(
     timestamps: true,
     versionKey: false,
     toJSON: {
+      virtuals: true,
       transform(_doc, ret) {
+        const r = ret as Record<string, unknown>;
+        // FE-facing canonical id field — replaces Mongo's `_id`. The FE used a
+        // `normalizeId` shim until this transform landed (Day-13 follow-up).
+        r.id = r._id;
+        delete r._id;
         // Defense-in-depth: even if a query slipped `+passwordHash`, never
         // serialize it to JSON responses.
-        delete (ret as Record<string, unknown>).passwordHash;
-        return ret;
+        delete r.passwordHash;
+        return r;
       },
     },
   },

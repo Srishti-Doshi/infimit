@@ -13,7 +13,13 @@
  * - anything else → 500 INTERNAL_ERROR (message scrubbed in non-dev)
  *
  * Always emits the envelope from docs/05-api-documentation.md §5.4:
- *   { error: { code, message, details? }, requestId }
+ *   { success: false, error: { code, message, details? }, requestId }
+ *
+ * The `success: false` flag mirrors the `success: true` flag on success
+ * responses. The FE's axios interceptor branches on this flag to distinguish
+ * a server-shaped error envelope (where `error.code` is machine-readable)
+ * from a network/transport error (where it falls back to `NETWORK_ERROR`).
+ * See frontend/src/lib/api-client.ts:106 in PR #5 for the consumer side.
  *
  * Per Express convention, must accept 4 args to be recognised as an error handler.
  */
@@ -70,6 +76,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   }
 
   res.status(apiErr.statusCode).json({
+    success: false,
     ...apiErr.toJSON(),
     requestId: req.requestId,
   });
