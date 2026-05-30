@@ -1,0 +1,69 @@
+/**
+ * In-memory stub for `@/config/s3` used by media integration tests.
+ *
+ * Tests assert on the FLOW (key shape, validator caps, DB writes), not on AWS
+ * SDK internals — so we replace the module entirely with deterministic fakes.
+ * `jest.mock('@/config/s3', () => require('./_s3Mock'))` at the top of each
+ * media-touching test file rewires the import boundary.
+ *
+ * The fake captures every presigned URL handed out and every delete attempted,
+ * so tests can assert on call sequences if they need to.
+ */
+import type { S3Client } from '@aws-sdk/client-s3';
+
+interface IssuedPresign {
+  key: string;
+  contentType: string;
+  ttl: number;
+}
+
+const issued: IssuedPresign[] = [];
+const deleted: string[] = [];
+
+export interface PresignedUpload {
+  uploadUrl: string;
+  key: string;
+  expiresIn: number;
+}
+
+export function getS3(): S3Client {
+  // Tests never call .send() on the returned client — the wrappers below cover
+  // every call site. Return a typed placeholder so consumers compile.
+  return {} as S3Client;
+}
+
+export function resetS3ForTests(): void {
+  issued.length = 0;
+  deleted.length = 0;
+}
+
+export async function presignUpload(
+  key: string,
+  contentType: string,
+  ttlSec = 300,
+): Promise<PresignedUpload> {
+  issued.push({ key, contentType, ttl: ttlSec });
+  return {
+    uploadUrl: `https://mock-s3.test/${key}?sig=fake&Content-Type=${encodeURIComponent(contentType)}`,
+    key,
+    expiresIn: ttlSec,
+  };
+}
+
+export function publicUrlFor(key: string): string {
+  return `https://mock-cdn.test/${key}`;
+}
+
+export async function deleteObject(key: string): Promise<void> {
+  deleted.push(key);
+}
+
+/** Test-only — assert on issued presigns from the test body. */
+export function __issuedPresigns(): readonly IssuedPresign[] {
+  return issued;
+}
+
+/** Test-only — assert on which keys had deleteObject called. */
+export function __deletedKeys(): readonly string[] {
+  return deleted;
+}

@@ -11,7 +11,7 @@
  */
 import { Router } from 'express';
 
-import { requireAuth, validate } from '@/middleware';
+import { requireAuth, requireRole, validate } from '@/middleware';
 import { notImplemented } from '@/modules/_shared/notImplemented';
 
 import {
@@ -38,24 +38,40 @@ router.get('/search', notImplemented('Subphase 5'));
 router.get('/slug/:slug', notImplemented('Subphase 4'));
 
 // ─── Subphase 3 — implemented now ───────────────────────────────────────
-router.post('/', requireAuth, validate({ body: createArticleBodySchema }), createArticleHandler);
+// Role gates mirror the docs/05-api-documentation.md §5.5 matrix:
+//   POST /articles            ✍️📝👑   (no readers)
+//   GET  /articles, /:id      👤        (any authenticated; service narrows)
+//   PATCH /:id                ✍️📝👑   (service further enforces ownership)
+//   POST /:id/submit          ✍️        (author-only; service confirms it's
+//                                          the article's author)
+//   DELETE /:id               ✍️📝👑   (service further enforces ownership)
+router.post(
+  '/',
+  requireAuth,
+  requireRole('author', 'editor', 'admin'),
+  validate({ body: createArticleBodySchema }),
+  createArticleHandler,
+);
 router.get('/', requireAuth, validate({ query: listArticlesQuerySchema }), listArticlesHandler);
 router.get('/:id', requireAuth, validate({ params: articleIdParamSchema }), getArticleHandler);
 router.patch(
   '/:id',
   requireAuth,
+  requireRole('author', 'editor', 'admin'),
   validate({ params: articleIdParamSchema, body: updateArticleBodySchema }),
   updateArticleHandler,
 );
 router.post(
   '/:id/submit',
   requireAuth,
+  requireRole('author'),
   validate({ params: articleIdParamSchema }),
   submitArticleHandler,
 );
 router.delete(
   '/:id',
   requireAuth,
+  requireRole('author', 'editor', 'admin'),
   validate({ params: articleIdParamSchema }),
   deleteArticleHandler,
 );
