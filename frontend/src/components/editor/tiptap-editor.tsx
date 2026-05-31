@@ -1,3 +1,5 @@
+import Image from '@tiptap/extension-image';
+import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -7,7 +9,9 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  Image as ImageIcon,
   Italic,
+  Link as LinkIcon,
   List,
   ListOrdered,
   Quote,
@@ -53,7 +57,21 @@ export function TiptapEditor({
   ariaLabel = 'Article body',
 }: TiptapEditorProps): JSX.Element {
   const editor = useEditor({
-    extensions: [StarterKit, Placeholder.configure({ placeholder })],
+    extensions: [
+      StarterKit,
+      Placeholder.configure({ placeholder }),
+      // Links open in a new tab + are not click-activatable inside the editor
+      // (otherwise clicking a link in edit-mode opens it instead of letting you
+      // edit it). `autolink` turns pasted URLs into links automatically.
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: '_blank' },
+      }),
+      // Block-level images only; base64 disabled (must go through the media
+      // pipeline). Day 9 will swap the URL prompt for the real MediaUploader.
+      Image.configure({ inline: false, allowBase64: false }),
+    ],
     content: value,
     editable,
     onUpdate({ editor: ed }) {
@@ -94,6 +112,51 @@ export function TiptapEditor({
       <EditorContent editor={editor} />
     </div>
   );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
+/** Accept only http/https/mailto URLs; reject anything else as a paranoia step. */
+function isSafeUrl(raw: string, allowMailto = false): boolean {
+  try {
+    const url = new URL(raw);
+    if (allowMailto && url.protocol === 'mailto:') return true;
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Link button behaviour: if a link is at the cursor, unset it. Otherwise
+ * prompt for a URL and apply. Day 3 uses `window.prompt` for tightness; a
+ * proper popover replaces it later.
+ */
+function handleToggleLink(editor: Editor | null): void {
+  if (!editor) return;
+  if (editor.isActive('link')) {
+    editor.chain().focus().unsetLink().run();
+    return;
+  }
+  const url = window.prompt('Enter URL', 'https://');
+  if (!url) return;
+  const trimmed = url.trim();
+  if (!isSafeUrl(trimmed, true)) return;
+  editor.chain().focus().extendMarkRange('link').setLink({ href: trimmed }).run();
+}
+
+/**
+ * Image button behaviour: prompt for URL + alt text and insert. Day 9 will
+ * replace the prompts with the real MediaUploader flow.
+ */
+function handleInsertImage(editor: Editor | null): void {
+  if (!editor) return;
+  const url = window.prompt('Image URL', 'https://');
+  if (!url) return;
+  const trimmed = url.trim();
+  if (!isSafeUrl(trimmed)) return;
+  const alt = window.prompt('Alt text (for accessibility)', '') ?? '';
+  editor.chain().focus().setImage({ src: trimmed, alt }).run();
 }
 
 // ─── Toolbar ──────────────────────────────────────────────────────────────
@@ -183,6 +246,22 @@ function Toolbar({ editor }: { editor: Editor | null }): JSX.Element {
         disabled={disabled}
         onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
         icon={<Code className="h-4 w-4" aria-hidden="true" />}
+      />
+
+      <Divider />
+
+      <ToolbarButton
+        ariaLabel={editor?.isActive('link') ? 'Remove link' : 'Add link'}
+        active={!!editor?.isActive('link')}
+        disabled={disabled}
+        onClick={() => handleToggleLink(editor)}
+        icon={<LinkIcon className="h-4 w-4" aria-hidden="true" />}
+      />
+      <ToolbarButton
+        ariaLabel="Insert image"
+        disabled={disabled}
+        onClick={() => handleInsertImage(editor)}
+        icon={<ImageIcon className="h-4 w-4" aria-hidden="true" />}
       />
 
       <Divider />
