@@ -1,9 +1,10 @@
 import { http, HttpResponse } from 'msw';
 
 import {
-  mockArticles,
+  mockArticleSummaries,
   mockCategories,
   mockComments,
+  mockDrafts,
   mockEpaperIssues,
   mockTags,
   mockUser,
@@ -239,16 +240,36 @@ export const handlers = [
   http.get(`${BASE}/categories`, () => ok(mockCategories)),
 
   // ── Articles ───────────────────────────────────────────────────────────
-  http.get(`${BASE}/articles`, () =>
-    ok(mockArticles, { page: 1, limit: 20, total: mockArticles.length }),
-  ),
-  http.get(`${BASE}/articles/feed/home`, () =>
-    ok({ hero: mockArticles[0], rail: mockArticles.slice(1) }),
-  ),
-  http.get(`${BASE}/articles/:slug`, ({ params }) => {
-    const article = mockArticles.find((a) => a.slug === params.slug);
+  // Subphase 3 author surface — list returns the {items, total} envelope to
+  // match the real backend. `authorId=me` filters to the seeded mock user;
+  // `status` narrows further. Real-backend RBAC also requires bearer, but the
+  // mock stays permissive in dev so MSW-only flows don't need a fake login.
+  http.get(`${BASE}/articles`, ({ request }) => {
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status');
+    const authorId = url.searchParams.get('authorId');
+    const items = mockDrafts.filter((d) => {
+      if (status && d.status !== status) return false;
+      if (authorId && authorId !== 'me' && d.authorId !== authorId) return false;
+      return true;
+    });
+    return ok({ items, total: items.length, page: 1, limit: 20 });
+  }),
+  // Single article by id — used by the edit-draft route (Day 5).
+  http.get(`${BASE}/articles/:id`, ({ params }) => {
+    const article = mockDrafts.find((d) => d.id === params.id);
     if (!article) return err('NOT_FOUND', 'Article not found', 404);
-    return ok({ ...article, body: '<p>Mock article body (Subphase 1 placeholder).</p>' });
+    return ok({ article });
+  }),
+  // Subphase 5 reader-shape handlers — kept on the renamed summary fixture
+  // until the reader UI lands.
+  http.get(`${BASE}/articles/feed/home`, () =>
+    ok({ hero: mockArticleSummaries[0], rail: mockArticleSummaries.slice(1) }),
+  ),
+  http.get(`${BASE}/articles/by-slug/:slug`, ({ params }) => {
+    const article = mockArticleSummaries.find((a) => a.slug === params.slug);
+    if (!article) return err('NOT_FOUND', 'Article not found', 404);
+    return ok({ article });
   }),
   http.post(`${BASE}/articles`, () => err('UNAUTHORIZED', 'Sign in to submit articles', 401)),
 
@@ -268,7 +289,7 @@ export const handlers = [
     const url = new URL(request.url);
     const q = url.searchParams.get('q') ?? '';
     const results = q
-      ? mockArticles.filter((a) => a.title.toLowerCase().includes(q.toLowerCase()))
+      ? mockArticleSummaries.filter((a) => a.title.toLowerCase().includes(q.toLowerCase()))
       : [];
     return ok(results, { page: 1, limit: 20, total: results.length });
   }),

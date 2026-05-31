@@ -98,22 +98,24 @@ describe('Subphase 1 smoke', () => {
 
   // ── MSW pipe ───────────────────────────────────────────────────────────
   describe('MSW + apiClient', () => {
-    interface ArticleSummary {
+    interface DraftSummary {
       id: string;
-      slug: string;
       title: string;
+      status: string;
     }
 
     it('returns the success envelope for a known endpoint', async () => {
-      const { data } = await apiClient.get<ApiResponse<ArticleSummary[]>>('/articles');
+      const { data } =
+        await apiClient.get<ApiResponse<{ items: DraftSummary[]; total: number }>>('/articles');
       expect(isApiSuccess(data)).toBe(true);
       if (isApiSuccess(data)) {
-        expect(data.data.length).toBeGreaterThan(0);
-        expect(data.data[0]).toMatchObject({
+        expect(data.data.items.length).toBeGreaterThan(0);
+        expect(data.data.items[0]).toMatchObject({
           id: expect.any(String),
-          slug: expect.any(String),
           title: expect.any(String),
+          status: expect.any(String),
         });
+        expect(data.data.total).toBe(data.data.items.length);
       }
     });
 

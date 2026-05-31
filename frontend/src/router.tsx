@@ -3,6 +3,7 @@ import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom';
 
 import { RedirectIfAuthed, RequireAuth, RequireRole } from '@/components/auth-guards';
 import { AppLayout } from '@/components/layout';
+import { PlaceholderPage } from '@/components/placeholder-page';
 import { Spinner } from '@/components/ui';
 
 import ForbiddenPage from '@/pages/forbidden';
@@ -24,7 +25,7 @@ const VerifyEmailPage = lazy(() => import('@/pages/auth/verify-email'));
 
 const ProfilePage = lazy(() => import('@/pages/dashboard/me'));
 const ReaderDashboardPage = lazy(() => import('@/pages/dashboard/reader'));
-const AuthorDashboardPage = lazy(() => import('@/pages/dashboard/author'));
+const DraftsPage = lazy(() => import('@/pages/dashboard/author/drafts'));
 const EditorDashboardPage = lazy(() => import('@/pages/dashboard/editor'));
 const AdminLandingPage = lazy(() => import('@/pages/dashboard/admin'));
 const AdminEditorsPage = lazy(() => import('@/pages/dashboard/admin/editors'));
@@ -87,7 +88,26 @@ const router = createBrowserRouter(
             { path: 'dashboard/reader/*', element: <ReaderDashboardPage /> },
             {
               element: <RequireRole roles={['author', 'editor', 'admin']} />,
-              children: [{ path: 'dashboard/author/*', element: <AuthorDashboardPage /> }],
+              children: [
+                // `/dashboard/author` redirects to the drafts list by sharing
+                // the same element — both URLs are valid entry points.
+                { path: 'dashboard/author', element: <DraftsPage /> },
+                { path: 'dashboard/author/drafts', element: <DraftsPage /> },
+                // New / edit / submissions screens land Day 5+; placeholders
+                // keep "New draft" + row-click navigations from 404-ing in dev.
+                {
+                  path: 'dashboard/author/drafts/new',
+                  element: <PlaceholderPage name="New draft" subphase={3} />,
+                },
+                {
+                  path: 'dashboard/author/drafts/:id',
+                  element: <PlaceholderPage name="Edit draft" subphase={3} />,
+                },
+                {
+                  path: 'dashboard/author/submissions',
+                  element: <PlaceholderPage name="My submissions" subphase={3} />,
+                },
+              ],
             },
             {
               element: <RequireRole roles={['editor', 'admin']} />,
