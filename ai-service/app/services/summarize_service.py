@@ -15,8 +15,17 @@ def summarize_text(text: str):
         
         messages=[#Prompt sent to the AI model.
             {
-                "role":"system",
-                "content":"Summarize the article in short."#This controls AI behavior.
+                "role": "system",
+                "content": """
+                You are a professional news summarizer.
+
+                Summarize the article clearly and professionally.
+
+                Rules:
+                - Keep summary under 100 words
+                - Use simple English
+                - Focus on important points
+                """
             },
             {
                 "role": "user",#Contains the actual article text.
