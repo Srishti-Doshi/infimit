@@ -2,7 +2,7 @@
 
 **Owners:** Zaman, Saloni · **Duration:** Week 1–2 · **Tag at exit:** `v0.1.0`
 
-> **Theme of this subphase:** Stand up a production-shaped FastAPI service that *does* nothing yet — but every cross-cutting concern (config, auth, logging, metrics, lazy model loader skeleton, healthz/readyz) is in place. By the end, the service is reachable from the backend container, and the project structure mirrors [`docs/12-folder-structure.md`](../../12-folder-structure.md) §12.3 exactly.
+> **Theme of this subphase:** Stand up a production-shaped FastAPI service that _does_ nothing yet — but every cross-cutting concern (config, auth, logging, metrics, lazy model loader skeleton, healthz/readyz) is in place. By the end, the service is reachable from the backend container, and the project structure mirrors [`docs/12-folder-structure.md`](../../12-folder-structure.md) §12.3 exactly.
 
 ---
 
@@ -20,6 +20,7 @@
 ## 2. Scope of Work
 
 ### In scope
+
 - FastAPI app factory + Uvicorn entrypoint.
 - Pydantic v2 settings (`app/config.py`) — read env, validate at boot.
 - `app/dependencies.py` — DI for internal-key auth, lazy model loader handle.
@@ -43,6 +44,7 @@
 - `.env.example`, `README.md`.
 
 ### Out of scope (later subphases)
+
 - Real model downloads, real `/summarize` implementation → Subphase 2 (stub) and Subphase 3 (real BART).
 - Final Prometheus metric definitions → Subphase 4.
 - Production observability dashboards → Subphase 5.
@@ -51,15 +53,15 @@
 
 ## 3. Relevant References
 
-| Topic | Doc |
-|-------|-----|
-| AI service spec (must read end to end) | [`06-ai-service.md`](../../06-ai-service.md) |
-| Endpoint envelopes | [`06-ai-service.md`](../../06-ai-service.md) §6.2 |
-| Design principles (stateless, narrow surface, graceful degradation) | [`06-ai-service.md`](../../06-ai-service.md) §6.1 |
-| Folder layout | [`12-folder-structure.md`](../../12-folder-structure.md) §12.3 |
-| Why a separate AI service | [`02-system-architecture.md`](../../02-system-architecture.md) §2.3.3 |
-| Dockerfile guidance | [`11-devops.md`](../../11-devops.md) §11.4 |
-| Local compose | [`11-devops.md`](../../11-devops.md) §11.3 |
+| Topic                                                               | Doc                                                                   |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| AI service spec (must read end to end)                              | [`06-ai-service.md`](../../06-ai-service.md)                          |
+| Endpoint envelopes                                                  | [`06-ai-service.md`](../../06-ai-service.md) §6.2                     |
+| Design principles (stateless, narrow surface, graceful degradation) | [`06-ai-service.md`](../../06-ai-service.md) §6.1                     |
+| Folder layout                                                       | [`12-folder-structure.md`](../../12-folder-structure.md) §12.3        |
+| Why a separate AI service                                           | [`02-system-architecture.md`](../../02-system-architecture.md) §2.3.3 |
+| Dockerfile guidance                                                 | [`11-devops.md`](../../11-devops.md) §11.4                            |
+| Local compose                                                       | [`11-devops.md`](../../11-devops.md) §11.3                            |
 
 ---
 
@@ -112,6 +114,7 @@ ai-service/
 ### Endpoint contracts to lock in this subphase
 
 #### `GET /v1/healthz` (no auth)
+
 ```json
 {
   "status": "ok",
@@ -122,7 +125,9 @@ ai-service/
 ```
 
 #### `GET /v1/readyz` (no auth)
+
 Returns **200** only when:
+
 - App boot completed.
 - (Future) Required models successfully lazy-loadable. In Subphase 1 the loader is a no-op so always returns ready.
 
@@ -134,10 +139,15 @@ Returns **200** only when:
 ```
 
 #### All other endpoints (this subphase)
+
 Return **501 NOT_IMPLEMENTED** with envelope:
+
 ```json
 {
-  "error": { "code": "NOT_IMPLEMENTED", "message": "Endpoint not implemented yet" }
+  "error": {
+    "code": "NOT_IMPLEMENTED",
+    "message": "Endpoint not implemented yet"
+  }
 }
 ```
 
@@ -150,6 +160,7 @@ Return **501 NOT_IMPLEMENTED** with envelope:
 ### Logging contract (structlog)
 
 Every request emits a single JSON log line at request completion with at least:
+
 ```json
 {
   "ts": "2026-05-11T08:30:11Z",
@@ -167,13 +178,13 @@ Every request emits a single JSON log line at request completion with at least:
 
 ### Env schema (`app/config.py`) — minimum
 
-| Var | Required | Example |
-|-----|----------|---------|
-| `AI_INTERNAL_KEY` | yes | random 32-char |
-| `PORT` | yes | 8000 |
-| `LOG_LEVEL` | yes | `info` |
-| `MODELS_CACHE_DIR` | yes | `/models` |
-| `ENABLE_METRICS` | yes | `true` |
+| Var                | Required | Example        |
+| ------------------ | -------- | -------------- |
+| `AI_INTERNAL_KEY`  | yes      | random 32-char |
+| `PORT`             | yes      | 8000           |
+| `LOG_LEVEL`        | yes      | `info`         |
+| `MODELS_CACHE_DIR` | yes      | `/models`      |
+| `ENABLE_METRICS`   | yes      | `true`         |
 
 Pydantic `Settings` class with `model_config = SettingsConfigDict(env_file=".env")`.
 
@@ -193,13 +204,16 @@ A single instance lives on `app.state.model_loader` and is exposed via `Depends(
 ## 5. Dependencies
 
 ### Blocking
+
 - None.
 
 ### Soft
+
 - Backend handler's confirmation that the internal-key header is `X-Internal-Key` (already in `docs/06-ai-service.md`).
 - Backend confirms internal URL in compose: `http://ai-service:8000`.
 
 ### Provides for downstream
+
 - The skeleton + auth + healthz are consumed by **integration day** smoke tests starting Subphase 1.
 - The contract envelope is locked here and inherited by every future endpoint.
 
@@ -240,13 +254,13 @@ A single instance lives on `app.state.model_loader` and is exposed via `Depends(
 
 ## 8. Communication Points with Other Handlers
 
-| With | When | What |
-|------|------|------|
-| **Backend** | Kickoff (Day 1) | Lock `X-Internal-Key` header name. Lock compose URL `http://ai-service:8000`. Confirm both teams agree on the error envelope shape (`{"error": {"code", "message"}}`). |
-| **Backend** | Day 4 | Provide a working stub of `AI_INTERNAL_KEY` so backend can wire its env var. |
-| **Backend** | Integration Day | Cross-ping from backend container; verify auth works (401 on missing key, 200 on correct key + healthz bypass). |
-| **Frontend** | — | None this subphase. AI service is not reachable from the SPA. |
-| **All** | Daily standup | Surface model-storage and image-size decisions early. |
+| With         | When            | What                                                                                                                                                                   |
+| ------------ | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Backend**  | Kickoff (Day 1) | Lock `X-Internal-Key` header name. Lock compose URL `http://ai-service:8000`. Confirm both teams agree on the error envelope shape (`{"error": {"code", "message"}}`). |
+| **Backend**  | Day 4           | Provide a working stub of `AI_INTERNAL_KEY` so backend can wire its env var.                                                                                           |
+| **Backend**  | Integration Day | Cross-ping from backend container; verify auth works (401 on missing key, 200 on correct key + healthz bypass).                                                        |
+| **Frontend** | —               | None this subphase. AI service is not reachable from the SPA.                                                                                                          |
+| **All**      | Daily standup   | Surface model-storage and image-size decisions early.                                                                                                                  |
 
 ---
 
@@ -269,6 +283,7 @@ A single instance lives on `app.state.model_loader` and is exposed via `Depends(
 - [ ] Decision recorded: **models mounted via volume**, not baked into image. Location `./models:/models`.
 
 ### Acceptance checklist
+
 - `docker compose up` brings up `ai-service` in < 30 s (no model loaded).
 - `curl -H "X-Internal-Key: $KEY" http://localhost:8000/v1/summarize -X POST -d '{}'` → 501 with envelope.
 - `curl http://localhost:8000/v1/healthz` (no key) → 200.
@@ -280,13 +295,13 @@ A single instance lives on `app.state.model_loader` and is exposed via `Depends(
 
 ## 10. Risks & Blockers
 
-| Risk | Mitigation |
-|------|------------|
-| Docker image bloats above 1.5 GB before any model | Use `python:3.11-slim` runner, install only runtime deps; defer `transformers` and `torch` imports to lazy load — but they still inflate the image. If image exceeds budget, switch to a `pip install --no-cache-dir` strategy and consider `python:3.11-slim-bookworm` minimal variant. |
-| `torch` install resolves GPU wheels by default | Pin to `torch==2.x+cpu` and use the CPU index URL in `requirements.txt`. |
-| `transformers` cache writes inside container break read-only FS | Set `TRANSFORMERS_CACHE=/models` env; volume-mount that path. |
-| Structured logging library churn (structlog vs loguru vs std logging) | Pick **structlog** and stick with it — it's documented in [`06-ai-service.md`](../../06-ai-service.md). Configure once in `middleware/logging.py`. |
-| Pydantic v1 vs v2 confusion | Use Pydantic v2; pin `pydantic>=2.5,<3`. Use `pydantic-settings` for env config. |
-| Internal key leaks via logs | Strip headers from request logging middleware. Allowlist only safe headers (`User-Agent`, `Accept`). |
-| FastAPI returns its own 422 format vs our envelope | Override the default `RequestValidationError` exception handler to wrap into `{"error": {"code": "VALIDATION_ERROR", "message": ...}}`. |
-| Test pollution between tests due to module-level FastAPI app | Use `pytest` fixture that builds a fresh app per test session; never import the global app instance in tests. |
+| Risk                                                                  | Mitigation                                                                                                                                                                                                                                                                               |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Docker image bloats above 1.5 GB before any model                     | Use `python:3.11-slim` runner, install only runtime deps; defer `transformers` and `torch` imports to lazy load — but they still inflate the image. If image exceeds budget, switch to a `pip install --no-cache-dir` strategy and consider `python:3.11-slim-bookworm` minimal variant. |
+| `torch` install resolves GPU wheels by default                        | Pin to `torch==2.x+cpu` and use the CPU index URL in `requirements.txt`.                                                                                                                                                                                                                 |
+| `transformers` cache writes inside container break read-only FS       | Set `TRANSFORMERS_CACHE=/models` env; volume-mount that path.                                                                                                                                                                                                                            |
+| Structured logging library churn (structlog vs loguru vs std logging) | Pick **structlog** and stick with it — it's documented in [`06-ai-service.md`](../../06-ai-service.md). Configure once in `middleware/logging.py`.                                                                                                                                       |
+| Pydantic v1 vs v2 confusion                                           | Use Pydantic v2; pin `pydantic>=2.5,<3`. Use `pydantic-settings` for env config.                                                                                                                                                                                                         |
+| Internal key leaks via logs                                           | Strip headers from request logging middleware. Allowlist only safe headers (`User-Agent`, `Accept`).                                                                                                                                                                                     |
+| FastAPI returns its own 422 format vs our envelope                    | Override the default `RequestValidationError` exception handler to wrap into `{"error": {"code": "VALIDATION_ERROR", "message": ...}}`.                                                                                                                                                  |
+| Test pollution between tests due to module-level FastAPI app          | Use `pytest` fixture that builds a fresh app per test session; never import the global app instance in tests.                                                                                                                                                                            |
