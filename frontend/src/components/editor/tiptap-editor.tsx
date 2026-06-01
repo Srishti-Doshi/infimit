@@ -19,8 +19,9 @@ import {
   Strikethrough,
   Undo2,
 } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
+import { ImageInsertDialog } from '@/components/editor/image-insert-dialog';
 import { cn } from '@/lib/cn';
 
 /**
@@ -101,6 +102,12 @@ export function TiptapEditor({
     editor?.setEditable(editable);
   }, [editor, editable]);
 
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+
+  function handleImageInsert({ src, alt }: { src: string; alt: string }): void {
+    editor?.chain().focus().setImage({ src, alt }).run();
+  }
+
   return (
     <div
       className={cn(
@@ -108,8 +115,13 @@ export function TiptapEditor({
         className,
       )}
     >
-      <Toolbar editor={editor} />
+      <Toolbar editor={editor} onImageClick={() => setImageDialogOpen(true)} />
       <EditorContent editor={editor} />
+      <ImageInsertDialog
+        open={imageDialogOpen}
+        onOpenChange={setImageDialogOpen}
+        onInsert={handleImageInsert}
+      />
     </div>
   );
 }
@@ -145,23 +157,15 @@ function handleToggleLink(editor: Editor | null): void {
   editor.chain().focus().extendMarkRange('link').setLink({ href: trimmed }).run();
 }
 
-/**
- * Image button behaviour: prompt for URL + alt text and insert. Day 9 will
- * replace the prompts with the real MediaUploader flow.
- */
-function handleInsertImage(editor: Editor | null): void {
-  if (!editor) return;
-  const url = window.prompt('Image URL', 'https://');
-  if (!url) return;
-  const trimmed = url.trim();
-  if (!isSafeUrl(trimmed)) return;
-  const alt = window.prompt('Alt text (for accessibility)', '') ?? '';
-  editor.chain().focus().setImage({ src: trimmed, alt }).run();
-}
-
 // ─── Toolbar ──────────────────────────────────────────────────────────────
 
-function Toolbar({ editor }: { editor: Editor | null }): JSX.Element {
+function Toolbar({
+  editor,
+  onImageClick,
+}: {
+  editor: Editor | null;
+  onImageClick: () => void;
+}): JSX.Element {
   // Render placeholder buttons while the editor mounts so layout doesn't jump.
   const disabled = !editor;
 
@@ -260,7 +264,7 @@ function Toolbar({ editor }: { editor: Editor | null }): JSX.Element {
       <ToolbarButton
         ariaLabel="Insert image"
         disabled={disabled}
-        onClick={() => handleInsertImage(editor)}
+        onClick={onImageClick}
         icon={<ImageIcon className="h-4 w-4" aria-hidden="true" />}
       />
 
