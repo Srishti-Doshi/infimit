@@ -5,6 +5,7 @@
  * `docs/04-database-design.md` and will be ported to typed contracts in
  * Subphase 2+. Keep fixtures intentionally thin so they're easy to swap.
  */
+import type { Article } from '@/types/article';
 
 export const mockUser = {
   id: 'usr_demo_001',
@@ -81,7 +82,7 @@ export const mockArticleSummaries = [
  * Loosely typed here (string for `_` placeholders) so this file stays
  * dependency-free; handlers narrow to `Article` at the consumer.
  */
-export const mockDrafts = [
+export const mockDrafts: Article[] = [
   {
     id: 'art_draft_001',
     title: 'Untitled draft about campus accessibility',
@@ -157,6 +158,36 @@ export const mockDrafts = [
     approvedAt: null,
     createdAt: '2026-05-25T11:00:00.000Z',
     updatedAt: '2026-05-29T18:00:00.000Z',
+  },
+  // A draft that passes every submission check — used by Day-11 submit tests.
+  // Body HTML and plainText are kept in sync: Tiptap's `onUpdate` fires on
+  // mount with the parsed body's text, which would otherwise stomp on a
+  // short HTML / long plainText mismatch.
+  {
+    id: 'art_ready_001',
+    title: 'Edtech in 2026: a research roundup',
+    subtitle: 'Findings from twelve campus pilots this term',
+    body: '<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>',
+    plainText:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+    coverImageUrl: 'https://cdn.example.com/ready-cover.jpg',
+    coverImageMediaId: '6a1a610c26432f0687a8c9ff',
+    media: ['6a1a610c26432f0687a8c9ff'],
+    category: 'tech_in_education',
+    subcategory: null,
+    tags: ['edtech', 'research', '2026'],
+    location: 'Indore',
+    authorId: 'usr_demo_001',
+    organisationId: null,
+    editorId: null,
+    status: 'draft',
+    rejectionReason: null,
+    version: 2,
+    submittedAt: null,
+    publishedAt: null,
+    approvedAt: null,
+    createdAt: '2026-05-28T09:00:00.000Z',
+    updatedAt: '2026-05-30T11:00:00.000Z',
   },
 ];
 
