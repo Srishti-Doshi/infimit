@@ -27,9 +27,43 @@ import { loadEnv } from './env';
 
 let client: S3Client | null = null;
 
+/**
+ * Throws a clear "S3 not configured" error when a required env var is empty.
+ * Day-13 follow-up from PR #7: previously, calling presignUpload / deleteObject
+ * with empty creds failed deep inside the AWS SDK with a cryptic "Region is
+ * missing" or "Credentials missing" message that didn't point at the actual
+ * fix (`cp .env.example .env` after pulling Subphase 3).
+ *
+ * `S3_REGION` defaults to `us-east-1` so it's always set. `S3_BUCKET` is the
+ * one that MUST be present for any operation. Credentials may legitimately
+ * be empty in production (the SDK uses IAM role / shared config fallback);
+ * in dev / test we require them too because there's no fallback available.
+ */
+function assertS3Configured(env: ReturnType<typeof loadEnv>): void {
+  const missing: string[] = [];
+  if (!env.S3_BUCKET) missing.push('S3_BUCKET');
+  // In non-production envs, the SDK has no credential fallback chain to lean
+  // on, so explicit creds are required. Production allows empty here and
+  // relies on IAM role / shared config picked up by the default chain.
+  if (env.NODE_ENV !== 'production') {
+    if (!env.S3_ACCESS_KEY) missing.push('S3_ACCESS_KEY');
+    if (!env.S3_SECRET_KEY) missing.push('S3_SECRET_KEY');
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `S3 not configured: missing ${missing.join(', ')}. ` +
+        `In dev, copy backend/.env.example to backend/.env — defaults point at the ` +
+        `MinIO service in docker-compose.dev.yml (start it with ` +
+        `\`docker compose -f docker-compose.dev.yml up -d minio minio-init\`). ` +
+        `In production, set these env vars (or use IAM role auth) before booting.`,
+    );
+  }
+}
+
 export function getS3(): S3Client {
   if (client) return client;
   const env = loadEnv();
+  assertS3Configured(env);
   const cfg: S3ClientConfig = {
     region: env.S3_REGION,
     forcePathStyle: env.S3_FORCE_PATH_STYLE,
