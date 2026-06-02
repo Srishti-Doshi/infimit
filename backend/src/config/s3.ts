@@ -17,6 +17,7 @@
  */
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   PutObjectCommand,
   S3Client,
   type S3ClientConfig,
@@ -153,4 +154,23 @@ export async function deleteObject(key: string): Promise<void> {
   const env = loadEnv();
   const s3 = getS3();
   await s3.send(new DeleteObjectCommand({ Bucket: env.S3_BUCKET, Key: key }));
+}
+
+/**
+ * Issue a presigned GET URL — short-lived URL the client can fetch the
+ * binary from directly. Used by the e-paper `/download` endpoint to 302
+ * the reader at S3 instead of proxying the bytes through Express.
+ *
+ * Default TTL = 300 s (matches `S3_PRESIGN_TTL_SEC`). Tune downward for
+ * sensitive content (Phase 2 may want 60 s for paywalled PDFs).
+ */
+export async function presignDownload(key: string, ttlSec?: number): Promise<string> {
+  const env = loadEnv();
+  const expiresIn = ttlSec ?? env.S3_PRESIGN_TTL_SEC;
+  const s3 = getS3();
+  const command = new GetObjectCommand({
+    Bucket: env.S3_BUCKET,
+    Key: key,
+  });
+  return getSignedUrl(s3, command, { expiresIn });
 }

@@ -80,12 +80,12 @@ describe('Subphase 1 smoke tests', () => {
     // Real as of Subphase 2: /v1/auth/*, /v1/users/*, /v1/organisations/*
     // Real as of Subphase 3: /v1/articles/* (write surface), /v1/media/*
     // Real as of Subphase 4: /v1/articles/* (full lifecycle), /v1/comments/*,
-    //   /v1/notifications/*, /v1/articles/:articleId/comments/*
+    //   /v1/notifications/*, /v1/articles/:articleId/comments/*,
+    //   /v1/epapers/*, /v1/search
     // The list below is endpoints that remain notImplemented skeletons.
     it.each([
       ['GET', '/v1/articles/feed/home'],
       ['POST', '/v1/analytics/track'],
-      ['GET', '/v1/search'],
     ])('%s %s returns 501 with envelope', async (method, path) => {
       const req = request(app);
       const res = method === 'POST' ? await req.post(path).send({}) : await req.get(path);
