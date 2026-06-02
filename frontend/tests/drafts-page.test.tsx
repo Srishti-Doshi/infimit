@@ -9,22 +9,23 @@ import { renderWithProviders } from '@/test/render';
 const BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/v1';
 
 describe('<DraftsPage>', () => {
-  it('lists the current user’s drafts with title, status, and last-edited columns', async () => {
+  it('lists only the current user’s drafts (submitted articles live elsewhere)', async () => {
     renderWithProviders(<DraftsPage />, { initialEntries: ['/dashboard/author/drafts'] });
 
-    // Heading renders immediately.
-    expect(screen.getByRole('heading', { name: /my articles/i })).toBeInTheDocument();
+    // Heading + the cross-link to the submissions tracker.
+    expect(screen.getByRole('heading', { name: /my drafts/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /view submissions/i })).toBeInTheDocument();
 
-    // The seeded mockDrafts include a "draft" titled about accessibility and a
-    // "submitted" one about funding — assert both render with their statuses.
+    // Seeded draft fixture renders.
     expect(
       await screen.findByText(/untitled draft about campus accessibility/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/inside the 2026 research-funding shake-up/i)).toBeInTheDocument();
 
-    // Status badges from the ArticleStatusBadge component.
-    expect(screen.getAllByText(/^Draft$/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/in review/i)).toBeInTheDocument();
+    // Submitted fixture must NOT appear here — it belongs to the submissions
+    // page after the Day-12 split.
+    expect(
+      screen.queryByText(/inside the 2026 research-funding shake-up/i),
+    ).not.toBeInTheDocument();
   });
 
   it('renders the empty state when the list is empty', async () => {
@@ -36,7 +37,7 @@ describe('<DraftsPage>', () => {
 
     renderWithProviders(<DraftsPage />, { initialEntries: ['/dashboard/author/drafts'] });
 
-    await waitFor(() => expect(screen.getByText(/no articles yet/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/no drafts yet/i)).toBeInTheDocument());
     expect(screen.getByRole('link', { name: /start writing/i })).toBeInTheDocument();
   });
 });

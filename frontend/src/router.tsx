@@ -3,14 +3,13 @@ import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom';
 
 import { RedirectIfAuthed, RequireAuth, RequireRole } from '@/components/auth-guards';
 import { AppLayout } from '@/components/layout';
-import { PlaceholderPage } from '@/components/placeholder-page';
 import { Spinner } from '@/components/ui';
 
 import ForbiddenPage from '@/pages/forbidden';
 import NotFoundPage from '@/pages/not-found';
 
 // Lazy-loaded route chunks — each becomes its own bundle so the entry chunk
-// stays small. Shared `PlaceholderPage` is de-duplicated by Rollup.
+// stays small.
 const HomePage = lazy(() => import('@/pages/home'));
 const CategoryPage = lazy(() => import('@/pages/category'));
 const ArticlePage = lazy(() => import('@/pages/article'));
@@ -26,6 +25,9 @@ const VerifyEmailPage = lazy(() => import('@/pages/auth/verify-email'));
 const ProfilePage = lazy(() => import('@/pages/dashboard/me'));
 const ReaderDashboardPage = lazy(() => import('@/pages/dashboard/reader'));
 const DraftsPage = lazy(() => import('@/pages/dashboard/author/drafts'));
+const NewDraftPage = lazy(() => import('@/pages/dashboard/author/drafts/new'));
+const EditDraftPage = lazy(() => import('@/pages/dashboard/author/drafts/edit'));
+const SubmissionsPage = lazy(() => import('@/pages/dashboard/author/submissions'));
 const EditorDashboardPage = lazy(() => import('@/pages/dashboard/editor'));
 const AdminLandingPage = lazy(() => import('@/pages/dashboard/admin'));
 const AdminEditorsPage = lazy(() => import('@/pages/dashboard/admin/editors'));
@@ -95,18 +97,9 @@ const router = createBrowserRouter(
                 { path: 'dashboard/author/drafts', element: <DraftsPage /> },
                 // New / edit / submissions screens land Day 5+; placeholders
                 // keep "New draft" + row-click navigations from 404-ing in dev.
-                {
-                  path: 'dashboard/author/drafts/new',
-                  element: <PlaceholderPage name="New draft" subphase={3} />,
-                },
-                {
-                  path: 'dashboard/author/drafts/:id',
-                  element: <PlaceholderPage name="Edit draft" subphase={3} />,
-                },
-                {
-                  path: 'dashboard/author/submissions',
-                  element: <PlaceholderPage name="My submissions" subphase={3} />,
-                },
+                { path: 'dashboard/author/drafts/new', element: <NewDraftPage /> },
+                { path: 'dashboard/author/drafts/:id', element: <EditDraftPage /> },
+                { path: 'dashboard/author/submissions', element: <SubmissionsPage /> },
               ],
             },
             {
