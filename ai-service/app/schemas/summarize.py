@@ -1,7 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 
 class SummaryRequest(BaseModel):
-    text: str
+    text: str = Field(...,min_length=10, max_length=5000)
+    
 
 
 
