@@ -58,6 +58,16 @@ export async function deleteObject(key: string): Promise<void> {
   deleted.push(key);
 }
 
+/**
+ * Mirror of `presignDownload` from the real module. Returns a deterministic
+ * `mock-s3.test` URL embedding the key so tests can assert on the 302
+ * Location from the e-paper download endpoint.
+ */
+export async function presignDownload(key: string, ttlSec = 300): Promise<string> {
+  issued.push({ key, contentType: 'application/octet-stream', ttl: ttlSec });
+  return `https://mock-s3.test/${key}?sig=fake-get&Expires=${ttlSec}`;
+}
+
 /** Test-only — assert on issued presigns from the test body. */
 export function __issuedPresigns(): readonly IssuedPresign[] {
   return issued;

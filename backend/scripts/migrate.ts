@@ -23,6 +23,7 @@ import { logger } from '../src/config/logger';
 
 import { Article } from '../src/modules/articles/model';
 import { Comment } from '../src/modules/comments/model';
+import { Epaper } from '../src/modules/epaper/model';
 import { Media } from '../src/modules/media/model';
 import { Notification } from '../src/modules/notifications/model';
 import { Organisation } from '../src/modules/organisations/model';
@@ -42,6 +43,7 @@ const MODELS: RegisteredModel[] = [
   { name: 'Media', model: Media as Model<unknown> },
   { name: 'Comment', model: Comment as Model<unknown> },
   { name: 'Notification', model: Notification as Model<unknown> },
+  { name: 'Epaper', model: Epaper as Model<unknown> },
 ];
 
 async function syncModel(entry: RegisteredModel): Promise<void> {
