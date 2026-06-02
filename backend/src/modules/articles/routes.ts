@@ -38,12 +38,19 @@ router.get('/search', notImplemented('Subphase 5'));
 router.get('/slug/:slug', notImplemented('Subphase 4'));
 
 // ─── Subphase 3 — implemented now ───────────────────────────────────────
-// Role gates mirror the docs/05-api-documentation.md §5.5 matrix:
+// Role gates mirror the docs/05-api-documentation.md §5.5 matrix, with two
+// pragmatic widenings from the strict ✍️ icon read:
+//   - submit accepts admin so platform owners can dogfood the full author flow
+//     (Day-13 follow-up from PR #7 — service-layer ownership check still
+//     prevents admin from submitting someone ELSE's draft).
+//   - editor stays excluded from submit since editor work is curation; an
+//     editor approving their own submission is a conflict of interest.
+//
 //   POST /articles            ✍️📝👑   (no readers)
 //   GET  /articles, /:id      👤        (any authenticated; service narrows)
 //   PATCH /:id                ✍️📝👑   (service further enforces ownership)
-//   POST /:id/submit          ✍️        (author-only; service confirms it's
-//                                          the article's author)
+//   POST /:id/submit          ✍️👑     (author or admin; service confirms
+//                                          the actor owns the article)
 //   DELETE /:id               ✍️📝👑   (service further enforces ownership)
 router.post(
   '/',
@@ -64,7 +71,7 @@ router.patch(
 router.post(
   '/:id/submit',
   requireAuth,
-  requireRole('author'),
+  requireRole('author', 'admin'),
   validate({ params: articleIdParamSchema }),
   submitArticleHandler,
 );

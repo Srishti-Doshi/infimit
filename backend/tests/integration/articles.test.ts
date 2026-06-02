@@ -100,6 +100,12 @@ describe('POST /v1/articles', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.article.status).toBe('draft');
+    // Day-13 follow-up from PR #7: locks `version === 0` on the POST response.
+    // Srishti observed `version > 0` during real-backend integration, but the
+    // cause was an FE autosave loop firing PATCH before reading the create
+    // response (fixed in PR #7). If a future FE bug reproduces the
+    // "version starts > 0" symptom, this assertion proves the backend isn't
+    // at fault — look at the FE call sequence around POST /articles.
     expect(res.body.data.article.version).toBe(0);
     expect(res.body.data.article.slug).toBe('ai-in-the-classroom');
     expect(res.body.data.article.authorId).toBe(author.id);
@@ -437,7 +443,7 @@ describe('POST /v1/articles/:id/submit', () => {
     expect(res.status).toBe(403);
   });
 
-  it('forbids editors from submitting (only the author can)', async () => {
+  it('forbids editors from submitting (conflict of interest — editors curate, not author)', async () => {
     const author = await seedUser('author');
     const editor = await seedUser('editor');
     const cover = await seedCoverMedia(author.id);
@@ -449,6 +455,41 @@ describe('POST /v1/articles/:id/submit', () => {
     const res = await request(app)
       .post(`/v1/articles/${created.body.data.article.id}/submit`)
       .set('Authorization', `Bearer ${editor.token}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('admin can submit their own draft (dogfooding — Day-13 follow-up from PR #7)', async () => {
+    // Admins can dogfood the full author flow on their own articles. The
+    // route guard accepts (author, admin); the service-layer ownership check
+    // (`article.authorId === userId`) still prevents admin from submitting
+    // someone else's draft (covered by the next test).
+    const admin = await seedUser('admin');
+    const cover = await seedCoverMedia(admin.id);
+    const created = await request(app)
+      .post('/v1/articles')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send(VALID_CREATE_BODY(cover));
+
+    const res = await request(app)
+      .post(`/v1/articles/${created.body.data.article.id}/submit`)
+      .set('Authorization', `Bearer ${admin.token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.article.status).toBe('submitted');
+    expect(res.body.data.article.submittedAt).toBeTruthy();
+  });
+
+  it("forbids admin from submitting someone else's draft (ownership check holds)", async () => {
+    const author = await seedUser('author');
+    const admin = await seedUser('admin');
+    const cover = await seedCoverMedia(author.id);
+    const created = await request(app)
+      .post('/v1/articles')
+      .set('Authorization', `Bearer ${author.token}`)
+      .send(VALID_CREATE_BODY(cover));
+
+    const res = await request(app)
+      .post(`/v1/articles/${created.body.data.article.id}/submit`)
+      .set('Authorization', `Bearer ${admin.token}`);
     expect(res.status).toBe(403);
   });
 
