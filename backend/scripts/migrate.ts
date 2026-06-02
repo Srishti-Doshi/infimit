@@ -24,6 +24,7 @@ import { logger } from '../src/config/logger';
 import { Article } from '../src/modules/articles/model';
 import { Comment } from '../src/modules/comments/model';
 import { Media } from '../src/modules/media/model';
+import { Notification } from '../src/modules/notifications/model';
 import { Organisation } from '../src/modules/organisations/model';
 import { Session } from '../src/modules/auth/model';
 import { User } from '../src/modules/users/model';
@@ -40,6 +41,7 @@ const MODELS: RegisteredModel[] = [
   { name: 'Article', model: Article as Model<unknown> },
   { name: 'Media', model: Media as Model<unknown> },
   { name: 'Comment', model: Comment as Model<unknown> },
+  { name: 'Notification', model: Notification as Model<unknown> },
 ];
 
 async function syncModel(entry: RegisteredModel): Promise<void> {

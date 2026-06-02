@@ -1,2 +1,262 @@
-// Subphase 4: comment lifecycle (pending → approved/rejected/hidden).
-export {};
+/**
+ * Comments service — business logic for the comments module.
+ *
+ * Surface:
+ *   - postComment       — any authenticated user posts; status defaults to `pending`.
+ *   - listForArticle    — public read of approved comments on an article.
+ *   - listPending       — editor/admin moderation queue across all articles.
+ *   - moderateComment   — editor/admin sets status to approved/rejected/hidden.
+ *   - deleteComment     — owner deletes their own (any status); editor/admin can delete any.
+ *
+ * Manual moderation only in Phase 1 (all new comments default to `pending`).
+ * AI moderation (the `aiModeration` sub-doc fields) is Phase 2.
+ *
+ * Events:
+ *   - `comment.approved` fires when a pending comment is approved. The
+ *     notifications module subscribes; the audit-log stub in events.ts
+ *     records the would-be recipient even if notifications fails.
+ */
+import { Types } from 'mongoose';
+
+import { auditLog } from '@/shared/audit';
+import { ApiError } from '@/shared/errors';
+import { articlesRepo } from '@/modules/articles';
+import { usersRepo } from '@/modules/users';
+import type { UserRole } from '@/modules/users';
+
+import * as commentsRepo from './repository';
+import { commentEvents } from './events';
+import type { CommentDocument, CommentModel, CommentStatus } from './model';
+
+// ─── post comment ───────────────────────────────────────────────────────
+
+export interface PostCommentInput {
+  articleId: string;
+  userId: string;
+  body: string;
+  parentId?: string | null;
+}
+
+export async function postComment(input: PostCommentInput): Promise<CommentModel> {
+  if (!Types.ObjectId.isValid(input.articleId)) {
+    throw ApiError.notFound('Article not found');
+  }
+
+  // Article must exist + be published (you can only comment on live articles).
+  const article = await articlesRepo.findById(input.articleId);
+  if (!article || article.status !== 'published') {
+    throw ApiError.notFound('Article not found');
+  }
+
+  // Parent comment (if any) must exist + belong to the same article + be
+  // approved. Threading on rejected/hidden parents would be weird.
+  if (input.parentId) {
+    if (!Types.ObjectId.isValid(input.parentId)) {
+      throw ApiError.validation('Invalid parentId');
+    }
+    const parent = await commentsRepo.findById(input.parentId);
+    if (!parent || parent.articleId.toString() !== input.articleId) {
+      throw ApiError.notFound('Parent comment not found');
+    }
+    if (parent.status !== 'approved') {
+      throw ApiError.invalidState('Cannot reply to a non-approved comment');
+    }
+  }
+
+  const comment = await commentsRepo.createComment({
+    articleId: new Types.ObjectId(input.articleId),
+    userId: new Types.ObjectId(input.userId),
+    body: input.body,
+    parentId: input.parentId ? new Types.ObjectId(input.parentId) : null,
+  });
+
+  auditLog(
+    {
+      entity: 'comment',
+      entityId: comment._id.toString(),
+      action: 'posted',
+      actor: input.userId,
+      details: {
+        articleId: input.articleId,
+        parentId: input.parentId ?? null,
+        bodyLength: input.body.length,
+      },
+    },
+    'comment_posted',
+  );
+
+  return comment;
+}
+
+// ─── list approved (public) ─────────────────────────────────────────────
+
+export async function listForArticle(
+  articleId: string,
+  options: { page?: number; limit?: number } = {},
+): Promise<{ items: CommentModel[]; total: number; page: number; limit: number }> {
+  if (!Types.ObjectId.isValid(articleId)) {
+    throw ApiError.notFound('Article not found');
+  }
+
+  const filter = {
+    articleId: new Types.ObjectId(articleId),
+    status: 'approved' as CommentStatus,
+  };
+
+  const { items, total } = await commentsRepo.listByFilter(filter, options);
+  return {
+    items,
+    total,
+    page: options.page ?? 1,
+    limit: options.limit ?? 20,
+  };
+}
+
+// ─── list pending (moderation queue) ────────────────────────────────────
+
+export async function listPending(input: {
+  actorRole: UserRole;
+  page?: number;
+  limit?: number;
+}): Promise<{ items: CommentModel[]; total: number; page: number; limit: number }> {
+  if (input.actorRole !== 'editor' && input.actorRole !== 'admin') {
+    throw ApiError.forbidden('Only editors or admins can view the moderation queue');
+  }
+
+  const { items, total } = await commentsRepo.listByFilter(
+    { status: 'pending' },
+    { page: input.page, limit: input.limit },
+  );
+
+  return {
+    items,
+    total,
+    page: input.page ?? 1,
+    limit: input.limit ?? 20,
+  };
+}
+
+// ─── moderation ─────────────────────────────────────────────────────────
+
+export interface ModerateCommentInput {
+  commentId: string;
+  actorId: string;
+  actorRole: UserRole;
+  status: 'approved' | 'rejected' | 'hidden';
+}
+
+export async function moderateComment(input: ModerateCommentInput): Promise<CommentModel> {
+  if (input.actorRole !== 'editor' && input.actorRole !== 'admin') {
+    throw ApiError.forbidden('Only editors or admins can moderate comments');
+  }
+  if (!Types.ObjectId.isValid(input.commentId)) {
+    throw ApiError.notFound('Comment not found');
+  }
+
+  const existing = await commentsRepo.findById(input.commentId);
+  if (!existing) {
+    throw ApiError.notFound('Comment not found');
+  }
+
+  // Same-status no-op: still record the moderation but don't re-emit the
+  // approval event (would cause duplicate notifications).
+  const wasAlreadyApproved = existing.status === 'approved';
+
+  const updated = await commentsRepo.setStatus(
+    existing._id,
+    input.status,
+    new Types.ObjectId(input.actorId),
+  );
+  if (!updated) {
+    throw ApiError.notFound('Comment not found');
+  }
+
+  auditLog(
+    {
+      entity: 'comment',
+      entityId: updated._id.toString(),
+      action: `moderated_${input.status}`,
+      actor: input.actorId,
+      details: {
+        articleId: updated.articleId.toString(),
+        prevStatus: existing.status,
+        nextStatus: input.status,
+      },
+    },
+    'comment_moderated',
+  );
+
+  // Emit `comment.approved` only when this transition crossed into approved
+  // from a non-approved prior state. Re-approving an already-approved comment
+  // is idempotent and must not refire the event.
+  if (input.status === 'approved' && !wasAlreadyApproved) {
+    // Load article + commenter for the payload — notifications listener needs
+    // the article author's id and the commenter's display name.
+    const [article, commenter] = await Promise.all([
+      articlesRepo.findById(updated.articleId),
+      usersRepo.findById(updated.userId),
+    ]);
+
+    if (article && commenter) {
+      commentEvents.emit('comment.approved', {
+        commentId: updated._id.toString(),
+        articleId: updated.articleId.toString(),
+        articleAuthorId: article.authorId.toString(),
+        commenterId: updated.userId.toString(),
+        commenterName: commenter.name,
+      });
+    }
+  }
+
+  return updated;
+}
+
+// ─── delete ─────────────────────────────────────────────────────────────
+
+export interface DeleteCommentInput {
+  commentId: string;
+  actorId: string;
+  actorRole: UserRole;
+}
+
+export async function deleteComment(input: DeleteCommentInput): Promise<void> {
+  if (!Types.ObjectId.isValid(input.commentId)) {
+    throw ApiError.notFound('Comment not found');
+  }
+
+  const existing = await commentsRepo.findById(input.commentId);
+  if (!existing) {
+    throw ApiError.notFound('Comment not found');
+  }
+
+  const isOwner = existing.userId.toString() === input.actorId;
+  const isPrivileged = input.actorRole === 'editor' || input.actorRole === 'admin';
+  if (!isOwner && !isPrivileged) {
+    throw ApiError.forbidden('Not permitted to delete this comment');
+  }
+
+  const deleted = await commentsRepo.deleteById(existing._id);
+  if (!deleted) {
+    // Concurrent delete — treat as success.
+    return;
+  }
+
+  auditLog(
+    {
+      entity: 'comment',
+      entityId: existing._id.toString(),
+      action: 'deleted',
+      actor: input.actorId,
+      details: {
+        articleId: existing.articleId.toString(),
+        priorStatus: existing.status,
+        byOwner: isOwner,
+      },
+    },
+    'comment_deleted',
+  );
+}
+
+// Re-export the document type so callers (controller) can reference it
+// without a deep import.
+export type { CommentDocument };
