@@ -5,6 +5,7 @@
  * `docs/04-database-design.md` and will be ported to typed contracts in
  * Subphase 2+. Keep fixtures intentionally thin so they're easy to swap.
  */
+import type { Article } from '@/types/article';
 
 export const mockUser = {
   id: 'usr_demo_001',
@@ -33,13 +34,18 @@ export const mockCategories = [
   { id: 'cat_opinion', slug: 'opinion', name: 'Opinion' },
 ];
 
-export const mockArticles = [
+/**
+ * Subphase 5 reader-shape summaries — used by the still-stubbed homepage feed,
+ * search, and by-slug handlers. Renamed from `mockArticles` in Subphase 3 to
+ * make room for the real Article-shape `mockDrafts` below.
+ */
+export const mockArticleSummaries = [
   {
     id: 'art_demo_001',
     slug: 'global-higher-education-trends-2026',
     title: 'Global Higher Education Trends in 2026',
     excerpt: 'A look at the institutional shifts shaping universities worldwide this year.',
-    category: 'world',
+    category: 'research_innovation',
     author: { id: 'usr_author_01', name: 'Ishita Mishra' },
     coverImageUrl: null,
     publishedAt: '2026-05-10T09:00:00.000Z',
@@ -50,7 +56,7 @@ export const mockArticles = [
     slug: 'inside-the-2026-engineering-rankings',
     title: 'Inside the 2026 Engineering Rankings',
     excerpt: 'Where Indian institutions stand against their global peers this year.',
-    category: 'india',
+    category: 'campus_news',
     author: { id: 'usr_author_02', name: 'Arjun Sharma' },
     coverImageUrl: null,
     publishedAt: '2026-05-08T13:30:00.000Z',
@@ -61,11 +67,127 @@ export const mockArticles = [
     slug: 'why-research-funding-models-matter',
     title: 'Why Research Funding Models Matter',
     excerpt: 'The quiet policy decisions reshaping postgraduate research worldwide.',
-    category: 'opinion',
+    category: 'education_policy',
     author: { id: 'usr_author_03', name: 'Priya Nair' },
     coverImageUrl: null,
     publishedAt: '2026-05-05T11:15:00.000Z',
     readingTimeMinutes: 5,
+  },
+];
+
+/**
+ * Subphase 3 author-shape mock drafts — mirror the real Article wire shape.
+ * Used by the new GET /v1/articles + /v1/articles/:id handlers.
+ *
+ * Loosely typed here (string for `_` placeholders) so this file stays
+ * dependency-free; handlers narrow to `Article` at the consumer.
+ */
+export const mockDrafts: Article[] = [
+  {
+    id: 'art_draft_001',
+    title: 'Untitled draft about campus accessibility',
+    subtitle: '',
+    body: '<p>Notes so far — needs more structure before submitting.</p>',
+    plainText: 'Notes so far — needs more structure before submitting.',
+    coverImageUrl: null,
+    coverImageMediaId: null,
+    media: [],
+    category: 'campus_news',
+    subcategory: null,
+    tags: ['accessibility'],
+    location: null,
+    authorId: 'usr_demo_001',
+    organisationId: null,
+    editorId: null,
+    status: 'draft',
+    rejectionReason: null,
+    version: 3,
+    submittedAt: null,
+    publishedAt: null,
+    approvedAt: null,
+    createdAt: '2026-05-28T10:00:00.000Z',
+    updatedAt: '2026-05-29T16:42:00.000Z',
+  },
+  {
+    id: 'art_draft_002',
+    title: 'Edtech adoption survey — Q2 trends',
+    subtitle: 'What the latest CIO-panel data tells us',
+    body: '<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>',
+    plainText: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
+    coverImageUrl: null,
+    coverImageMediaId: null,
+    media: [],
+    category: 'tech_in_education',
+    subcategory: null,
+    tags: ['survey', 'edtech', 'cio'],
+    location: 'Bengaluru',
+    authorId: 'usr_demo_001',
+    organisationId: null,
+    editorId: null,
+    status: 'draft',
+    rejectionReason: null,
+    version: 1,
+    submittedAt: null,
+    publishedAt: null,
+    approvedAt: null,
+    createdAt: '2026-05-30T08:15:00.000Z',
+    updatedAt: '2026-05-30T08:30:00.000Z',
+  },
+  {
+    id: 'art_submitted_001',
+    title: 'Inside the 2026 research-funding shake-up',
+    subtitle: 'Why the new NIRF metric matters',
+    body: '<p>Full-length article body here.</p>',
+    plainText:
+      'Full-length article body here. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+    coverImageUrl: 'https://cdn.example.com/cover.jpg',
+    coverImageMediaId: '6a1a610c26432f0687a8c9aa',
+    media: ['6a1a610c26432f0687a8c9aa'],
+    category: 'research_innovation',
+    subcategory: null,
+    tags: ['research', 'policy', 'nirf'],
+    location: 'New Delhi',
+    authorId: 'usr_demo_001',
+    organisationId: null,
+    editorId: null,
+    status: 'submitted',
+    rejectionReason: null,
+    version: 5,
+    submittedAt: '2026-05-29T18:00:00.000Z',
+    publishedAt: null,
+    approvedAt: null,
+    createdAt: '2026-05-25T11:00:00.000Z',
+    updatedAt: '2026-05-29T18:00:00.000Z',
+  },
+  // A draft that passes every submission check — used by Day-11 submit tests.
+  // Body HTML and plainText are kept in sync: Tiptap's `onUpdate` fires on
+  // mount with the parsed body's text, which would otherwise stomp on a
+  // short HTML / long plainText mismatch.
+  {
+    id: 'art_ready_001',
+    title: 'Edtech in 2026: a research roundup',
+    subtitle: 'Findings from twelve campus pilots this term',
+    body: '<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>',
+    plainText:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+    coverImageUrl: 'https://cdn.example.com/ready-cover.jpg',
+    coverImageMediaId: '6a1a610c26432f0687a8c9ff',
+    media: ['6a1a610c26432f0687a8c9ff'],
+    category: 'tech_in_education',
+    subcategory: null,
+    tags: ['edtech', 'research', '2026'],
+    location: 'Indore',
+    authorId: 'usr_demo_001',
+    organisationId: null,
+    editorId: null,
+    status: 'draft',
+    rejectionReason: null,
+    version: 2,
+    submittedAt: null,
+    publishedAt: null,
+    approvedAt: null,
+    createdAt: '2026-05-28T09:00:00.000Z',
+    updatedAt: '2026-05-30T11:00:00.000Z',
   },
 ];
 
