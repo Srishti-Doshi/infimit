@@ -60,3 +60,32 @@ export const authLimiter = buildLimiter({
   windowMs: 60_000,
   max: 10,
 });
+
+/**
+ * Per-user limiter for `POST /v1/articles/:articleId/comments`. 10/min per
+ * user per docs §5.17. Keyed on the authenticated user's id (not IP) so a
+ * shared NAT doesn't penalise multiple readers.
+ *
+ * Editors and admins bypass — they need to clear moderation backlogs without
+ * tripping over the limit (doc §10 explicitly calls this out). Anonymous
+ * requests fall through to the auth guard and never reach this limiter.
+ */
+export const commentLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    // req.user is populated by requireAuth which runs BEFORE this middleware
+    // on the comments routes. Fallback to IP keeps the limiter functional
+    // even if the order is ever wrong.
+    return req.user?.id ?? req.ip ?? 'unknown';
+  },
+  skip: (req) => {
+    const role = req.user?.role;
+    return role === 'editor' || role === 'admin';
+  },
+  handler: (_req, _res, next) => {
+    next(ApiError.rateLimited());
+  },
+});

@@ -21,7 +21,14 @@
  */
 import { logger } from '@/config/logger';
 
-export type AuditEntity = 'user' | 'organisation' | 'session' | 'article' | 'comment' | 'media';
+export type AuditEntity =
+  | 'user'
+  | 'organisation'
+  | 'session'
+  | 'article'
+  | 'comment'
+  | 'media'
+  | 'notification';
 
 export interface AuditEvent {
   entity: AuditEntity;
