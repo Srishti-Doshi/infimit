@@ -1,6 +1,7 @@
 import { registerArticleEventListeners } from '@/modules/articles/events';
 import { registerCommentEventListeners } from '@/modules/comments';
 import { registerNotificationListeners } from '@/modules/notifications';
+import { registerSearchListeners } from '@/modules/search';
 
 /**
  * Register cross-module event listeners.
@@ -12,15 +13,17 @@ import { registerNotificationListeners } from '@/modules/notifications';
  *   1. Each module's OWN listeners first (the audit-log stubs). These are
  *      the forensic record of would-be notifications and run regardless of
  *      whether downstream subscribers succeed.
- *   2. Cross-module listeners (notifications) last. They subscribe to BOTH
- *      article and comment events; they need the emitters to already exist.
+ *   2. Cross-module listeners (notifications, search) last. They subscribe
+ *      to article + comment events; they need the emitters to already exist.
  *
- * Subphase 3 added articles. Subphase 4 (PR #11) adds comments + the
+ * Subphase 3 added articles. Subphase 4 added comments (PR #11) + the
  * notifications module that fans out to in-app notifications for every
- * article + comment lifecycle event.
+ * article + comment lifecycle event, and the search module's index hooks
+ * on article.published / article.unpublished (PR #12).
  */
 export function registerEventListeners(): void {
   registerArticleEventListeners();
   registerCommentEventListeners();
   registerNotificationListeners();
+  registerSearchListeners();
 }
