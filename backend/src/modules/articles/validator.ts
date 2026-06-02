@@ -104,3 +104,64 @@ export type ListArticlesQuery = z.infer<typeof listArticlesQuerySchema>;
 export const articleIdParamSchema = z.object({
   id: objectIdString,
 });
+
+/** Path-param: article slug for the public read endpoint (Subphase 4 GET /:slug). */
+export const articleSlugParamSchema = z.object({
+  slug: z.string().trim().toLowerCase().min(1).max(200),
+});
+
+/**
+ * `POST /v1/articles/:id/reject` — editor/admin rejects a submitted article.
+ *
+ * Rejection reason is required and visible to the author (it's the message
+ * they'll act on when revising). Min 10 chars to discourage drive-by "no"s,
+ * max 500 to keep the notification body manageable.
+ */
+export const rejectArticleBodySchema = z.object({
+  rejectionReason: z
+    .string()
+    .trim()
+    .min(10, 'Rejection reason must be at least 10 characters')
+    .max(500, 'Rejection reason must be at most 500 characters'),
+});
+export type RejectArticleBody = z.infer<typeof rejectArticleBodySchema>;
+
+/**
+ * `PATCH /v1/articles/:id/placement` — editor/admin sets editorial-surface
+ * placement flags + priority for a PUBLISHED article. Service-layer rejects
+ * the transition if the article isn't published.
+ *
+ * `version` is required for optimistic concurrency (placement edits race
+ * with publish/unpublish + with other editors editing placement
+ * simultaneously).
+ */
+export const placementBodySchema = z
+  .object({
+    featured: z.boolean().optional(),
+    trending: z.boolean().optional(),
+    trail: z.boolean().optional(),
+    priority: z.coerce.number().int().min(0).max(100).optional(),
+    version: z.coerce.number().int().nonnegative(),
+  })
+  .refine(
+    (data) => {
+      const keys = Object.keys(data).filter((k) => k !== 'version');
+      return keys.length > 0;
+    },
+    { message: 'At least one placement field is required' },
+  );
+export type PlacementBody = z.infer<typeof placementBodySchema>;
+
+/**
+ * `POST /v1/articles/:id/ai/summary` — force-regenerate the AI summary.
+ *
+ * `force=true` (default) is the only way the FE invokes this — there's no
+ * other reason to hit the endpoint. Kept as a body field so a future
+ * "cache only" variant can be added without breaking the URL.
+ */
+export const regenerateSummaryBodySchema = z
+  .object({
+    force: z.boolean().optional().default(true),
+  })
+  .default({ force: true });
+export type RegenerateSummaryBody = z.infer<typeof regenerateSummaryBodySchema>;

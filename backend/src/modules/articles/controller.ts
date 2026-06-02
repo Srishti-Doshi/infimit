@@ -18,14 +18,28 @@ import { ApiError } from '@/shared/errors';
 import { asyncHandler } from '@/shared/utils/asyncHandler';
 
 import {
+  approveArticle,
   createDraft,
   getArticleById,
+  getArticleBySlug,
   listArticles,
+  publishArticle,
+  regenerateSummary,
+  rejectArticle,
+  setPlacement,
   softDeleteArticle,
   submitForReview,
+  unpublishArticle,
   updateDraft,
 } from './service';
-import type { CreateArticleBody, ListArticlesQuery, UpdateArticleBody } from './validator';
+import type {
+  CreateArticleBody,
+  ListArticlesQuery,
+  PlacementBody,
+  RegenerateSummaryBody,
+  RejectArticleBody,
+  UpdateArticleBody,
+} from './validator';
 
 export const createArticleHandler = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw ApiError.unauthorized();
@@ -104,4 +118,92 @@ export const deleteArticleHandler = asyncHandler(async (req: Request, res: Respo
     actorRole: req.user.role,
   });
   res.status(204).send();
+});
+
+// ─── Subphase 4 surface ─────────────────────────────────────────────────
+
+export const approveArticleHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const { id } = req.params as { id: string };
+  const article = await approveArticle({
+    articleId: id,
+    actorId: req.user.id,
+    actorRole: req.user.role,
+  });
+  res.status(200).json({ success: true, data: { article: article.toJSON() } });
+});
+
+export const rejectArticleHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const { id } = req.params as { id: string };
+  const body = req.body as RejectArticleBody;
+  const article = await rejectArticle({
+    articleId: id,
+    actorId: req.user.id,
+    actorRole: req.user.role,
+    rejectionReason: body.rejectionReason,
+  });
+  res.status(200).json({ success: true, data: { article: article.toJSON() } });
+});
+
+export const publishArticleHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const { id } = req.params as { id: string };
+  const article = await publishArticle({
+    articleId: id,
+    actorId: req.user.id,
+    actorRole: req.user.role,
+  });
+  res.status(200).json({ success: true, data: { article: article.toJSON() } });
+});
+
+export const unpublishArticleHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const { id } = req.params as { id: string };
+  const article = await unpublishArticle({
+    articleId: id,
+    actorId: req.user.id,
+    actorRole: req.user.role,
+  });
+  res.status(200).json({ success: true, data: { article: article.toJSON() } });
+});
+
+export const setPlacementHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const { id } = req.params as { id: string };
+  const body = req.body as PlacementBody;
+  const { version, ...patch } = body;
+  const article = await setPlacement({
+    articleId: id,
+    actorId: req.user.id,
+    actorRole: req.user.role,
+    version,
+    patch,
+  });
+  res.status(200).json({ success: true, data: { article: article.toJSON() } });
+});
+
+export const regenerateSummaryHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw ApiError.unauthorized();
+  const { id } = req.params as { id: string };
+  // `RegenerateSummaryBody` carries an optional `force` flag (defaults true).
+  // We don't branch on it yet — the service always regenerates — but the
+  // schema exists so a future "cache-only" path can be added without a
+  // breaking URL change.
+  const _body = req.body as RegenerateSummaryBody;
+  void _body;
+  const article = await regenerateSummary({
+    articleId: id,
+    actorId: req.user.id,
+    actorRole: req.user.role,
+  });
+  // Return the FULL article so the FE can update its local cache; the `ai`
+  // sub-object is what the regenerate UI badge actually consumes.
+  res.status(200).json({ success: true, data: { article: article.toJSON() } });
+});
+
+export const getArticleBySlugHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { slug } = req.params as { slug: string };
+  const article = await getArticleBySlug(slug);
+  res.status(200).json({ success: true, data: { article } });
 });

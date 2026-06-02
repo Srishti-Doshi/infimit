@@ -50,6 +50,13 @@ export interface ArticleAi {
   readingTimeMin: number;
   ttsAudioUrl: string | null;
   embedding: number[] | null;
+  /** True when the last AI run came back via the circuit-open fallback or
+   * an explicit degraded signal from the AI service. Lets the FE render a
+   * "summary unavailable" hint without an extra round-trip. */
+  degraded: boolean;
+  /** Which AI model produced the current summary. `circuit-open` is the
+   * sentinel value the proxy returns when its breaker has tripped. */
+  model: string;
 }
 
 export interface ArticleStats {
@@ -121,6 +128,8 @@ const AiSchema = new Schema<ArticleAi>(
     readingTimeMin: { type: Number, default: 0, min: 0 },
     ttsAudioUrl: { type: String, default: null },
     embedding: { type: [Number], default: null },
+    degraded: { type: Boolean, default: false },
+    model: { type: String, default: '' },
   },
   { _id: false },
 );
