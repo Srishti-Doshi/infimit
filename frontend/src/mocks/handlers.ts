@@ -1,9 +1,10 @@
 import { http, HttpResponse } from 'msw';
 
 import {
-  mockArticles,
+  mockArticleSummaries,
   mockCategories,
   mockComments,
+  mockDrafts,
   mockEpaperIssues,
   mockTags,
   mockUser,
@@ -83,6 +84,10 @@ let mockOrgsList: MockOrganisation[] = seedOrgs();
 let nextEditorId = 100;
 let nextOrgId = 100;
 
+/** Mutable drafts list — Subphase 3 author CRUD modifies this in place per session. */
+let mockDraftsState: Array<(typeof mockDrafts)[number]> = [...mockDrafts];
+let nextDraftId = 100;
+
 function hasBearer(request: Request): boolean {
   return Boolean(request.headers.get('authorization'));
 }
@@ -95,6 +100,8 @@ export function __resetMocks(): void {
   mockOrgsList = seedOrgs();
   nextEditorId = 100;
   nextOrgId = 100;
+  mockDraftsState = [...mockDrafts];
+  nextDraftId = 100;
 }
 
 /**
@@ -239,18 +246,151 @@ export const handlers = [
   http.get(`${BASE}/categories`, () => ok(mockCategories)),
 
   // ── Articles ───────────────────────────────────────────────────────────
-  http.get(`${BASE}/articles`, () =>
-    ok(mockArticles, { page: 1, limit: 20, total: mockArticles.length }),
-  ),
-  http.get(`${BASE}/articles/feed/home`, () =>
-    ok({ hero: mockArticles[0], rail: mockArticles.slice(1) }),
-  ),
-  http.get(`${BASE}/articles/:slug`, ({ params }) => {
-    const article = mockArticles.find((a) => a.slug === params.slug);
-    if (!article) return err('NOT_FOUND', 'Article not found', 404);
-    return ok({ ...article, body: '<p>Mock article body (Subphase 1 placeholder).</p>' });
+  // Subphase 3 author surface — list returns the {items, total} envelope to
+  // match the real backend. `authorId=me` filters to the seeded mock user;
+  // `status` narrows further. Real-backend RBAC also requires bearer, but the
+  // mock stays permissive in dev so MSW-only flows don't need a fake login.
+  http.get(`${BASE}/articles`, ({ request }) => {
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status');
+    const authorId = url.searchParams.get('authorId');
+    const items = mockDraftsState.filter((d) => {
+      if (status && d.status !== status) return false;
+      if (authorId && authorId !== 'me' && d.authorId !== authorId) return false;
+      return true;
+    });
+    return ok({ items, total: items.length, page: 1, limit: 20 });
   }),
-  http.post(`${BASE}/articles`, () => err('UNAUTHORIZED', 'Sign in to submit articles', 401)),
+  // Single article by id — used by the edit-draft route (Day 5).
+  http.get(`${BASE}/articles/:id`, ({ params }) => {
+    const article = mockDraftsState.find((d) => d.id === params.id);
+    if (!article) return err('NOT_FOUND', 'Article not found', 404);
+    return ok({ article });
+  }),
+  // Subphase 5 reader-shape handlers — kept on the renamed summary fixture
+  // until the reader UI lands.
+  http.get(`${BASE}/articles/feed/home`, () =>
+    ok({ hero: mockArticleSummaries[0], rail: mockArticleSummaries.slice(1) }),
+  ),
+  http.get(`${BASE}/articles/by-slug/:slug`, ({ params }) => {
+    const article = mockArticleSummaries.find((a) => a.slug === params.slug);
+    if (!article) return err('NOT_FOUND', 'Article not found', 404);
+    return ok({ article });
+  }),
+  // POST creates a draft. Real backend defaults status=draft + version=0 +
+  // authorId from the bearer; we mirror that here. Returns the new article
+  // wrapped in `{ article }` per the envelope contract.
+  http.post(`${BASE}/articles`, async ({ request }) => {
+    const body = (await request.json()) as Partial<(typeof mockDrafts)[number]> & {
+      mediaIds?: string[];
+    };
+    const now = new Date().toISOString();
+    nextDraftId += 1;
+    const newArticle: (typeof mockDrafts)[number] = {
+      id: `art_draft_${nextDraftId.toString().padStart(3, '0')}`,
+      title: body.title ?? '',
+      subtitle: body.subtitle ?? '',
+      body: body.body ?? '',
+      plainText: body.plainText ?? '',
+      coverImageUrl: null,
+      coverImageMediaId: body.coverImageMediaId ?? null,
+      media: body.mediaIds ?? [],
+      category: body.category ?? 'campus_news',
+      subcategory: null,
+      tags: body.tags ?? [],
+      location: body.location ?? null,
+      authorId: mockUserState.id,
+      organisationId: null,
+      editorId: null,
+      status: 'draft',
+      rejectionReason: null,
+      version: 0,
+      submittedAt: null,
+      publishedAt: null,
+      approvedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    mockDraftsState = [newArticle, ...mockDraftsState];
+    return HttpResponse.json({ success: true, data: { article: newArticle } }, { status: 201 });
+  }),
+
+  // PATCH enforces optimistic concurrency: the caller must echo the article's
+  // current `version`. Mismatch → 409 VERSION_CONFLICT with the live version
+  // in `details.currentVersion` so the FE can offer a reload.
+  http.patch(`${BASE}/articles/:id`, async ({ request, params }) => {
+    const body = (await request.json()) as Partial<(typeof mockDrafts)[number]> & {
+      version?: number;
+    };
+    const idx = mockDraftsState.findIndex((d) => d.id === params.id);
+    if (idx === -1) return err('NOT_FOUND', 'Article not found', 404);
+
+    const current = mockDraftsState[idx]!;
+    if (typeof body.version !== 'number' || body.version !== current.version) {
+      return err('VERSION_CONFLICT', 'Stale version', 409, {
+        currentVersion: current.version,
+      });
+    }
+
+    // `body.version` was a concurrency token, not a value to write — the spread
+    // below intentionally overwrites it with the bumped version.
+    const updated: (typeof mockDrafts)[number] = {
+      ...current,
+      ...body,
+      version: current.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    mockDraftsState = mockDraftsState.map((d, i) => (i === idx ? updated : d));
+    return ok({ article: updated });
+  }),
+
+  // POST /:id/submit — flips draft → submitted. Mirrors the backend's
+  // submission checklist (docs/07-workflows.md §7.1): title set, plainText
+  // ≥ 300 chars, cover attached, 1-10 tags. Each failure shapes the 422 with
+  // a precise `details.field` the FE can map inline. Already-submitted ⇒ 409
+  // INVALID_STATE so the FE can react idempotently.
+  http.post(`${BASE}/articles/:id/submit`, ({ params }) => {
+    const idx = mockDraftsState.findIndex((d) => d.id === params.id);
+    if (idx === -1) return err('NOT_FOUND', 'Article not found', 404);
+    const article = mockDraftsState[idx]!;
+
+    if (article.status !== 'draft') {
+      return err('INVALID_STATE', `Already ${article.status}`, 409);
+    }
+    if (!article.title || article.title.trim().length === 0) {
+      return err('VALIDATION_ERROR', 'Title is required', 422, { field: 'title' });
+    }
+    const len = (article.plainText ?? '').length;
+    if (len < 300) {
+      return err('VALIDATION_ERROR', 'Body too short', 422, {
+        field: 'body',
+        currentLength: len,
+        minLength: 300,
+      });
+    }
+    if (!article.coverImageMediaId) {
+      return err('VALIDATION_ERROR', 'Cover image is required', 422, {
+        field: 'coverImageMediaId',
+      });
+    }
+    const tagCount = article.tags?.length ?? 0;
+    if (tagCount < 1 || tagCount > 10) {
+      return err('VALIDATION_ERROR', 'Add 1–10 tags', 422, {
+        field: 'tags',
+        currentCount: tagCount,
+      });
+    }
+
+    const updated: (typeof mockDrafts)[number] = {
+      ...article,
+      status: 'submitted',
+      submittedAt: new Date().toISOString(),
+      version: article.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    mockDraftsState = mockDraftsState.map((d, i) => (i === idx ? updated : d));
+    return ok({ article: updated });
+  }),
 
   // ── Comments ───────────────────────────────────────────────────────────
   http.get(`${BASE}/articles/:articleId/comments`, ({ params }) =>
@@ -268,7 +408,7 @@ export const handlers = [
     const url = new URL(request.url);
     const q = url.searchParams.get('q') ?? '';
     const results = q
-      ? mockArticles.filter((a) => a.title.toLowerCase().includes(q.toLowerCase()))
+      ? mockArticleSummaries.filter((a) => a.title.toLowerCase().includes(q.toLowerCase()))
       : [];
     return ok(results, { page: 1, limit: 20, total: results.length });
   }),
@@ -288,7 +428,52 @@ export const handlers = [
   // ── Analytics ──────────────────────────────────────────────────────────
   http.post(`${BASE}/analytics/track`, () => new HttpResponse(null, { status: 204 })),
 
-  // ── Media ───────────────────────────────────────────────────────────────
+  // ── Media (Subphase 3) ────────────────────────────────────────────────
+  // The three-step S3 flow: presign → PUT to S3 → register. In mock mode we
+  // pretend the presign points at a localhost MinIO endpoint and intercept
+  // the bare PUT below so the FE flow runs end-to-end without an S3.
+  http.post(`${BASE}/media/upload-url`, async ({ request }) => {
+    const { mimeType, size, purpose } = (await request.json()) as {
+      mimeType: string;
+      size: number;
+      purpose: string;
+    };
+    void size;
+    const ext = (mimeType.split('/').pop() ?? 'bin').replace('+xml', '');
+    const key = `uploads/${purpose}/${Math.random().toString(36).slice(2, 10)}.${ext}`;
+    return ok({
+      uploadUrl: `http://localhost:9000/${key}`,
+      key,
+      expiresIn: 300,
+    });
+  }),
+  http.post(`${BASE}/media/register`, async ({ request }) => {
+    const body = (await request.json()) as {
+      key: string;
+      mimeType: string;
+      size: number;
+      purpose: string;
+      dimensions?: { width: number; height: number };
+    };
+    const now = new Date().toISOString();
+    const media = {
+      id: `med_${Math.random().toString(36).slice(2, 10)}`,
+      key: body.key,
+      url: `http://localhost:9000/${body.key}`,
+      mimeType: body.mimeType,
+      size: body.size,
+      purpose: body.purpose,
+      dimensions: body.dimensions ?? null,
+      uploadedBy: 'usr_demo_001',
+      refCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    return HttpResponse.json({ success: true, data: { media } }, { status: 201 });
+  }),
+  // Mock S3 — accept any bytes at the presigned URL above and return 200.
+  http.put('http://localhost:9000/uploads/*', () => new HttpResponse(null, { status: 200 })),
+  // Legacy Subphase 1 stub kept for any old caller; superseded by the trio above.
   http.post(`${BASE}/media`, () => err('UNAUTHORIZED', 'Sign in to upload', 401)),
 
   // ── AI proxy ───────────────────────────────────────────────────────────
