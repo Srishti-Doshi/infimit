@@ -1,32 +1,41 @@
 /**
- * Articles service — business logic for the articles module (Subphase 3 surface).
+ * Articles service — business logic for the articles module.
  *
- * Implements:
- *   - createDraft        — author starts a new article
- *   - updateDraft        — author edits a draft (optimistic concurrency)
- *   - getArticleById     — RBAC-gated read (owner / editor / admin during draft;
- *                          public when published — handled in Subphase 4)
- *   - listArticles       — list-mine for authors; broad filter for editor/admin
- *   - submitForReview    — draft → submitted (full validation table)
- *   - softDeleteArticle  — owner / editor / admin can soft-delete
+ * Subphase 3 surface (authors):
+ *   - createDraft, updateDraft, getArticleById, listArticles,
+ *     submitForReview, softDeleteArticle
+ *
+ * Subphase 4 surface (editors + admins + the AI pipeline):
+ *   - approveArticle      — submitted → approved; fires AI pipeline async
+ *   - rejectArticle       — submitted → rejected with a reason
+ *   - publishArticle      — approved → published; invalidates slug + feed caches
+ *   - unpublishArticle    — published → unpublished; invalidates slug + feed caches
+ *   - setPlacement        — placement flags on a published article (OCC)
+ *   - regenerateSummary   — force re-summarize via aiProxy; invalidate slug cache
+ *   - getArticleBySlug    — public read of a published article (cached)
  *
  * Cross-cutting:
- *   - Body is sanitized server-side (defence-in-depth, see modules/articles/
- *     sanitize.ts). `plainText` is derived from the sanitized HTML and is
- *     authoritative for char-count rules.
- *   - Optimistic concurrency on every mutation that flips state.
- *   - Media refCount accounting: bump on create / on new references in update;
- *     decrement on removed references or soft-delete. Articles never share a
- *     media doc by reference; the refCount counts each article-side mention.
+ *   - Body sanitized server-side; plainText authoritative for char counts.
+ *   - Optimistic concurrency on every state-flipping write.
+ *   - Media refCount accounting on create/update/softDelete.
+ *   - AI pipeline fan-out happens AFTER approval commits, via setImmediate.
+ *     A failed AI call never blocks or rolls back the approval — the article
+ *     persists with `ai.degraded=true` and an audit warning, and a Phase 2
+ *     backfill cron will retry.
+ *   - Cache invalidation is best-effort. `cache.del` swallows + logs Redis
+ *     errors so a Redis hiccup never blocks publish/unpublish.
  */
 import slugify from 'slugify';
 import { Types } from 'mongoose';
 
-import { auditLog } from '@/shared/audit';
+import { auditLog, auditWarn } from '@/shared/audit';
 import { ApiError } from '@/shared/errors';
 import { ErrorCode } from '@/shared/errors/errorCodes';
+import { cache } from '@/shared';
+import { aiProxy } from '@/modules/ai-proxy';
 import { mediaRepo } from '@/modules/media';
 import { usersRepo } from '@/modules/users';
+import { logger } from '@/config/logger';
 
 import { articleEvents } from './events';
 import type { ArticleModel, ArticleStatus } from './model';
@@ -35,6 +44,8 @@ import { plainTextFromHtml, sanitizeArticleBody } from './sanitize';
 
 import type { ArticleCategory } from '@/shared/constants/articleCategories';
 import type { UserRole } from '@/modules/users';
+
+const WORDS_PER_MINUTE = 200;
 
 const MIN_PLAIN_TEXT_CHARS = 300;
 const MAX_TITLE_CHARS = 200;
@@ -536,4 +547,503 @@ export async function softDeleteArticle(input: SoftDeleteInput): Promise<void> {
     },
     'article_soft_deleted',
   );
+}
+
+// ═══ Subphase 4 surface ═════════════════════════════════════════════════
+//
+// Editorial workflow (approve / reject / publish / unpublish / placement)
+// plus the AI pipeline orchestration on approve. Service-layer RBAC checks
+// supplement the route-layer requireRole — defense in depth.
+
+function wordCount(text: string): number {
+  if (!text) return 0;
+  return text
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 0).length;
+}
+
+/** Cache keys that should be invalidated when an article's public view
+ * changes (publish, unpublish, regenerate-AI on a published article). */
+function publicCacheKeys(slug: string, category: ArticleCategory): string[] {
+  return [
+    cache.cacheKeys.articleSlug(slug),
+    cache.cacheKeys.feedHome(),
+    cache.cacheKeys.feedTrending(),
+    cache.cacheKeys.feedCategory(category),
+  ];
+}
+
+/**
+ * Background fan-out for the AI summary after an article is approved.
+ * Runs via `setImmediate` from `approveArticle` so the HTTP response returns
+ * before the AI call starts. NEVER throws — failures are audit-warn'd and
+ * eaten so an AI outage can't block or roll back the approval.
+ *
+ * Two writes: the AI summary fields land via `setAiFields` (does not bump
+ * version — see repo.ts for why). If the AI proxy returns degraded=true,
+ * we still write the (empty) summary + degraded flag so the FE can show
+ * "summary unavailable" without a separate "did we even try" check.
+ */
+async function runApprovalAiPipeline(article: ArticleModel): Promise<void> {
+  try {
+    const text = article.plainText ?? '';
+    const [summarizeResult, readingTimeMin] = await Promise.all([
+      aiProxy.summarize(text, { maxWords: 60, style: 'neutral' }),
+      Promise.resolve(Math.ceil(wordCount(text) / WORDS_PER_MINUTE)),
+    ]);
+
+    await articlesRepo.setAiFields(article._id, {
+      summary: summarizeResult.summary,
+      readingTimeMin,
+      degraded: summarizeResult.degraded,
+      model: summarizeResult.model,
+    });
+
+    auditLog(
+      {
+        entity: 'article',
+        entityId: article._id.toString(),
+        action: 'ai_pipeline_completed',
+        details: {
+          degraded: summarizeResult.degraded,
+          model: summarizeResult.model,
+          readingTimeMin,
+          summaryLength: summarizeResult.summary.length,
+        },
+      },
+      'article_ai_pipeline_completed',
+    );
+  } catch (err) {
+    // Should never trip because aiProxy's fallback swallows breaker
+    // rejections — but if axios construction itself fails or setAiFields
+    // hits a DB error, we land here. Audit-warn, don't rethrow.
+    auditWarn(
+      {
+        entity: 'article',
+        entityId: article._id.toString(),
+        action: 'ai_pipeline_failed',
+        details: { error: err instanceof Error ? err.message : String(err) },
+      },
+      'article_ai_pipeline_failed',
+    );
+  }
+}
+
+// ─── approve ────────────────────────────────────────────────────────────
+
+export interface ApproveArticleInput {
+  articleId: string;
+  actorId: string;
+  actorRole: UserRole;
+}
+
+/**
+ * Editor / admin approves a submitted article. Transitions to `approved`,
+ * records the approver, and schedules the AI summary fan-out via setImmediate
+ * so the response returns instantly. The AI pipeline never blocks or
+ * rolls back this state change.
+ */
+export async function approveArticle(input: ApproveArticleInput): Promise<ArticleModel> {
+  if (input.actorRole !== 'editor' && input.actorRole !== 'admin') {
+    throw ApiError.forbidden('Only editors or admins can approve articles');
+  }
+  if (!Types.ObjectId.isValid(input.articleId)) {
+    throw ApiError.notFound('Article not found');
+  }
+  const article = await articlesRepo.findById(input.articleId);
+  if (!article) throw ApiError.notFound('Article not found');
+  if (article.status !== 'submitted') {
+    throw ApiError.invalidState('Only submitted articles can be approved');
+  }
+
+  const transitioned = await articlesRepo.transition({
+    id: article._id,
+    fromStatus: 'submitted',
+    toStatus: 'approved',
+    version: article.version,
+    set: { approvedAt: new Date(), editorId: new Types.ObjectId(input.actorId) },
+  });
+  if (!transitioned) {
+    throw new ApiError(409, ErrorCode.VERSION_CONFLICT, 'Article was modified elsewhere', {
+      details: { currentVersion: article.version },
+    });
+  }
+
+  auditLog(
+    {
+      entity: 'article',
+      entityId: transitioned._id.toString(),
+      action: 'approved',
+      actor: input.actorId,
+      details: { category: article.category },
+    },
+    'article_approved',
+  );
+
+  articleEvents.emit('article.approved', {
+    articleId: transitioned._id.toString(),
+    authorId: article.authorId.toString(),
+    editorId: input.actorId,
+    category: article.category,
+  });
+
+  // Fire AI pipeline async — don't await. `runApprovalAiPipeline` is its own
+  // error boundary; `.catch` here is defence-in-depth in case the function
+  // signature ever drifts.
+  setImmediate(() => {
+    void runApprovalAiPipeline(transitioned).catch((err: unknown) => {
+      logger.warn({ err, articleId: transitioned._id.toString() }, 'ai_pipeline_unhandled');
+    });
+  });
+
+  return transitioned;
+}
+
+// ─── reject ─────────────────────────────────────────────────────────────
+
+export interface RejectArticleInput {
+  articleId: string;
+  actorId: string;
+  actorRole: UserRole;
+  rejectionReason: string;
+}
+
+export async function rejectArticle(input: RejectArticleInput): Promise<ArticleModel> {
+  if (input.actorRole !== 'editor' && input.actorRole !== 'admin') {
+    throw ApiError.forbidden('Only editors or admins can reject articles');
+  }
+  if (!Types.ObjectId.isValid(input.articleId)) {
+    throw ApiError.notFound('Article not found');
+  }
+  const article = await articlesRepo.findById(input.articleId);
+  if (!article) throw ApiError.notFound('Article not found');
+  if (article.status !== 'submitted') {
+    throw ApiError.invalidState('Only submitted articles can be rejected');
+  }
+
+  const transitioned = await articlesRepo.transition({
+    id: article._id,
+    fromStatus: 'submitted',
+    toStatus: 'rejected',
+    version: article.version,
+    set: {
+      rejectionReason: input.rejectionReason,
+      editorId: new Types.ObjectId(input.actorId),
+    },
+  });
+  if (!transitioned) {
+    throw new ApiError(409, ErrorCode.VERSION_CONFLICT, 'Article was modified elsewhere', {
+      details: { currentVersion: article.version },
+    });
+  }
+
+  auditLog(
+    {
+      entity: 'article',
+      entityId: transitioned._id.toString(),
+      action: 'rejected',
+      actor: input.actorId,
+      details: { category: article.category, rejectionReason: input.rejectionReason },
+    },
+    'article_rejected',
+  );
+
+  articleEvents.emit('article.rejected', {
+    articleId: transitioned._id.toString(),
+    authorId: article.authorId.toString(),
+    editorId: input.actorId,
+    category: article.category,
+    rejectionReason: input.rejectionReason,
+  });
+
+  return transitioned;
+}
+
+// ─── publish ────────────────────────────────────────────────────────────
+
+export interface PublishArticleInput {
+  articleId: string;
+  actorId: string;
+  actorRole: UserRole;
+}
+
+export async function publishArticle(input: PublishArticleInput): Promise<ArticleModel> {
+  if (input.actorRole !== 'editor' && input.actorRole !== 'admin') {
+    throw ApiError.forbidden('Only editors or admins can publish articles');
+  }
+  if (!Types.ObjectId.isValid(input.articleId)) {
+    throw ApiError.notFound('Article not found');
+  }
+  const article = await articlesRepo.findById(input.articleId);
+  if (!article) throw ApiError.notFound('Article not found');
+  if (article.status !== 'approved') {
+    throw ApiError.invalidState('Only approved articles can be published');
+  }
+
+  const transitioned = await articlesRepo.transition({
+    id: article._id,
+    fromStatus: 'approved',
+    toStatus: 'published',
+    version: article.version,
+    set: { publishedAt: new Date() },
+  });
+  if (!transitioned) {
+    throw new ApiError(409, ErrorCode.VERSION_CONFLICT, 'Article was modified elsewhere', {
+      details: { currentVersion: article.version },
+    });
+  }
+
+  // Best-effort cache invalidation. `cache.del` swallows errors internally
+  // so a Redis hiccup can't block the publish. The slug cache is the most
+  // critical — a stale read would 404 because the pre-publish version
+  // returned 404 from getArticleBySlug; cache TTL of 5min is the upper
+  // bound on staleness.
+  await cache.del(...publicCacheKeys(transitioned.slug, article.category));
+
+  auditLog(
+    {
+      entity: 'article',
+      entityId: transitioned._id.toString(),
+      action: 'published',
+      actor: input.actorId,
+      details: { category: article.category, slug: transitioned.slug },
+    },
+    'article_published',
+  );
+
+  articleEvents.emit('article.published', {
+    articleId: transitioned._id.toString(),
+    authorId: article.authorId.toString(),
+    editorId: input.actorId,
+    category: article.category,
+    slug: transitioned.slug,
+  });
+
+  return transitioned;
+}
+
+// ─── unpublish ──────────────────────────────────────────────────────────
+
+export interface UnpublishArticleInput {
+  articleId: string;
+  actorId: string;
+  actorRole: UserRole;
+}
+
+export async function unpublishArticle(input: UnpublishArticleInput): Promise<ArticleModel> {
+  // Doc: 👑-only. Editors don't get the unpublish hammer — that's an admin
+  // call (removing live content has bigger blast radius than rejecting a
+  // submission).
+  if (input.actorRole !== 'admin') {
+    throw ApiError.forbidden('Only admins can unpublish articles');
+  }
+  if (!Types.ObjectId.isValid(input.articleId)) {
+    throw ApiError.notFound('Article not found');
+  }
+  const article = await articlesRepo.findById(input.articleId);
+  if (!article) throw ApiError.notFound('Article not found');
+  if (article.status !== 'published') {
+    throw ApiError.invalidState('Only published articles can be unpublished');
+  }
+
+  const transitioned = await articlesRepo.transition({
+    id: article._id,
+    fromStatus: 'published',
+    toStatus: 'unpublished',
+    version: article.version,
+  });
+  if (!transitioned) {
+    throw new ApiError(409, ErrorCode.VERSION_CONFLICT, 'Article was modified elsewhere', {
+      details: { currentVersion: article.version },
+    });
+  }
+
+  await cache.del(...publicCacheKeys(transitioned.slug, article.category));
+
+  auditLog(
+    {
+      entity: 'article',
+      entityId: transitioned._id.toString(),
+      action: 'unpublished',
+      actor: input.actorId,
+      details: { category: article.category, slug: transitioned.slug },
+    },
+    'article_unpublished',
+  );
+
+  articleEvents.emit('article.unpublished', {
+    articleId: transitioned._id.toString(),
+    authorId: article.authorId.toString(),
+    adminId: input.actorId,
+    category: article.category,
+    slug: transitioned.slug,
+  });
+
+  return transitioned;
+}
+
+// ─── placement ──────────────────────────────────────────────────────────
+
+export interface SetPlacementInput {
+  articleId: string;
+  actorId: string;
+  actorRole: UserRole;
+  version: number;
+  patch: {
+    featured?: boolean;
+    trending?: boolean;
+    trail?: boolean;
+    priority?: number;
+  };
+}
+
+export async function setPlacement(input: SetPlacementInput): Promise<ArticleModel> {
+  if (input.actorRole !== 'editor' && input.actorRole !== 'admin') {
+    throw ApiError.forbidden('Only editors or admins can set placement');
+  }
+  if (!Types.ObjectId.isValid(input.articleId)) {
+    throw ApiError.notFound('Article not found');
+  }
+  const article = await articlesRepo.findById(input.articleId);
+  if (!article) throw ApiError.notFound('Article not found');
+  if (article.status !== 'published') {
+    throw ApiError.invalidState('Only published articles can have placement set');
+  }
+
+  const updated = await articlesRepo.setPlacementWithVersion(
+    article._id,
+    input.version,
+    input.patch,
+  );
+  if (!updated) {
+    throw new ApiError(409, ErrorCode.VERSION_CONFLICT, 'Article was modified elsewhere', {
+      details: { currentVersion: article.version },
+    });
+  }
+
+  // Placement changes are FE-visible (featured strip, trending rail) so
+  // invalidate the related feed caches. The slug-page cache is not affected
+  // because placement isn't rendered on the article page.
+  await cache.del(
+    cache.cacheKeys.feedHome(),
+    cache.cacheKeys.feedTrending(),
+    cache.cacheKeys.feedCategory(article.category),
+  );
+
+  auditLog(
+    {
+      entity: 'article',
+      entityId: updated._id.toString(),
+      action: 'placement_updated',
+      actor: input.actorId,
+      details: { fields: Object.keys(input.patch), version: updated.version },
+    },
+    'article_placement_updated',
+  );
+
+  return updated;
+}
+
+// ─── regenerate AI summary ──────────────────────────────────────────────
+
+export interface RegenerateSummaryInput {
+  articleId: string;
+  actorId: string;
+  actorRole: UserRole;
+}
+
+/**
+ * Force-regenerate the AI summary on an approved or published article.
+ *
+ * RBAC: author (owner only), editor, admin. The author's case is "I revised
+ * something subtle and want a fresh summary" — they keep ownership over the
+ * AI on their own articles.
+ *
+ * Synchronous: the FE waits for the response (unlike approval's setImmediate
+ * fan-out) because the user explicitly triggered this and expects a result.
+ * Returns the updated `ai` payload so the FE can update its view without
+ * a refetch.
+ */
+export async function regenerateSummary(input: RegenerateSummaryInput): Promise<ArticleModel> {
+  if (!Types.ObjectId.isValid(input.articleId)) {
+    throw ApiError.notFound('Article not found');
+  }
+  const article = await articlesRepo.findById(input.articleId);
+  if (!article) throw ApiError.notFound('Article not found');
+
+  if (article.status !== 'approved' && article.status !== 'published') {
+    throw ApiError.invalidState('Only approved or published articles can regenerate AI summary');
+  }
+
+  // RBAC: author may regenerate ONLY their own article; editor / admin may
+  // regenerate any.
+  const isOwner = article.authorId.toString() === input.actorId;
+  const isPrivileged = input.actorRole === 'editor' || input.actorRole === 'admin';
+  if (!isOwner && !isPrivileged) {
+    throw ApiError.forbidden('Not permitted to regenerate this summary');
+  }
+
+  const result = await aiProxy.summarize(article.plainText ?? '', {
+    maxWords: 60,
+    style: 'neutral',
+  });
+  const readingTimeMin = Math.ceil(wordCount(article.plainText ?? '') / WORDS_PER_MINUTE);
+
+  const updated = await articlesRepo.setAiFields(article._id, {
+    summary: result.summary,
+    readingTimeMin,
+    degraded: result.degraded,
+    model: result.model,
+  });
+  if (!updated) {
+    // Race with soft-delete between the read and the write. Surface as 404.
+    throw ApiError.notFound('Article not found');
+  }
+
+  // If the article is published, the cached slug-page now has a stale
+  // summary — invalidate so the next public read sees fresh AI fields.
+  if (updated.status === 'published') {
+    await cache.del(cache.cacheKeys.articleSlug(updated.slug));
+  }
+
+  auditLog(
+    {
+      entity: 'article',
+      entityId: updated._id.toString(),
+      action: 'ai_summary_regenerated',
+      actor: input.actorId,
+      details: { degraded: result.degraded, model: result.model, readingTimeMin },
+    },
+    'article_ai_summary_regenerated',
+  );
+
+  return updated;
+}
+
+// ─── public slug read (cached) ──────────────────────────────────────────
+
+interface PublicArticleView {
+  [key: string]: unknown;
+}
+
+/**
+ * Read a PUBLISHED article by slug. Public — no auth required. Reads pass
+ * through `cache.getOrSet` so popular articles never round-trip to Mongo
+ * after the first hit. TTL is 5 minutes; publish/unpublish/regenerate
+ * invalidate eagerly.
+ *
+ * Returns the article's `toJSON()` shape directly (not the hydrated
+ * document) since the cached JSON survives JSON.parse round-trip. The
+ * controller wraps it in the success envelope.
+ */
+export async function getArticleBySlug(slug: string): Promise<PublicArticleView> {
+  const cacheKey = cache.cacheKeys.articleSlug(slug);
+  return cache.getOrSet<PublicArticleView>(cacheKey, cache.CACHE_TTL.articleSlug, async () => {
+    const article = await articlesRepo.findBySlug(slug);
+    if (!article || article.status !== 'published') {
+      throw ApiError.notFound('Article not found');
+    }
+    return article.toJSON() as PublicArticleView;
+  });
 }

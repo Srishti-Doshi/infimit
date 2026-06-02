@@ -164,3 +164,93 @@ export async function softDeleteById(id: Types.ObjectId | string): Promise<Artic
     { new: true },
   ).exec();
 }
+
+export interface SetAiFieldsInput {
+  summary?: string;
+  readingTimeMin?: number;
+  degraded?: boolean;
+  model?: string;
+  keywords?: string[];
+  ttsAudioUrl?: string | null;
+}
+
+/**
+ * Write AI-pipeline fields onto an article. Used by `approve` (initial
+ * summarize fan-out via `setImmediate`) and `regenerateSummary` (explicit
+ * refresh).
+ *
+ * Does NOT bump `version` or use optimistic concurrency — AI fill-in is an
+ * async side-effect that should never conflict with an in-flight editorial
+ * action. If an editor unpublishes between the approve transition and the
+ * AI write-back, we want the AI fields to land on the unpublished article
+ * anyway (still useful when it's re-published) rather than dropping silently.
+ *
+ * Does NOT filter on status — the same reason. The article may have moved
+ * on; the AI fields are still informative. `deletedAt:null` IS enforced so
+ * we don't resurrect soft-deleted rows.
+ */
+export async function setAiFields(
+  id: Types.ObjectId | string,
+  fields: SetAiFieldsInput,
+): Promise<ArticleModel | null> {
+  // Build a dotted-path $set so we update sub-fields of `ai` without clobbering
+  // the others (e.g. `keywords` set by a different path shouldn't get nuked
+  // by a summary-only write).
+  const set: Record<string, unknown> = {};
+  if (fields.summary !== undefined) set['ai.summary'] = fields.summary;
+  if (fields.readingTimeMin !== undefined) set['ai.readingTimeMin'] = fields.readingTimeMin;
+  if (fields.degraded !== undefined) set['ai.degraded'] = fields.degraded;
+  if (fields.model !== undefined) set['ai.model'] = fields.model;
+  if (fields.keywords !== undefined) set['ai.keywords'] = fields.keywords;
+  if (fields.ttsAudioUrl !== undefined) set['ai.ttsAudioUrl'] = fields.ttsAudioUrl;
+
+  if (Object.keys(set).length === 0) {
+    return Article.findOne({ _id: id, deletedAt: null }).exec();
+  }
+
+  return Article.findOneAndUpdate(
+    { _id: id, deletedAt: null },
+    { $set: set },
+    { new: true },
+  ).exec();
+}
+
+export interface SetPlacementInput {
+  featured?: boolean;
+  trending?: boolean;
+  trail?: boolean;
+  priority?: number;
+}
+
+/**
+ * Optimistic-concurrency update for an article's placement sub-document. Only
+ * `published` articles can have placement (a draft being "featured" makes no
+ * sense). Matches (id, version, deletedAt:null, status:'published') and
+ * increments version. Returns null on no-match — service maps that to 409
+ * VERSION_CONFLICT or 409 INVALID_STATE depending on which discriminator was
+ * the cause (service re-reads to differentiate).
+ *
+ * Dotted-path $set so we update only the requested placement fields and leave
+ * the others untouched.
+ */
+export async function setPlacementWithVersion(
+  id: Types.ObjectId | string,
+  version: number,
+  fields: SetPlacementInput,
+): Promise<ArticleModel | null> {
+  const set: Record<string, unknown> = {};
+  if (fields.featured !== undefined) set['placement.featured'] = fields.featured;
+  if (fields.trending !== undefined) set['placement.trending'] = fields.trending;
+  if (fields.trail !== undefined) set['placement.trail'] = fields.trail;
+  if (fields.priority !== undefined) set['placement.priority'] = fields.priority;
+
+  const update: UpdateQuery<ArticleDocument> = {
+    $set: set,
+    $inc: { version: 1 },
+  };
+  return Article.findOneAndUpdate(
+    { _id: id, version, deletedAt: null, status: 'published' },
+    update,
+    { new: true },
+  ).exec();
+}
