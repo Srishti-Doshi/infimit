@@ -32,6 +32,44 @@ export interface ArticleAuthorRef {
   avatarUrl?: string | null;
 }
 
+/**
+ * Editorial-surface placement flags + priority. Editors / admins set these on
+ * a published article via `PATCH /v1/articles/:id/placement`. Backend defaults
+ * to all-false / priority=0 on create; populated for every article doc, so
+ * the field is required on the read shape.
+ */
+export interface ArticlePlacement {
+  featured: boolean;
+  trending: boolean;
+  trail: boolean;
+  /** 0–100. Higher = higher in editor-curated lists. */
+  priority: number;
+}
+
+/**
+ * AI-derived enrichments persisted on the article. Populated by the backend
+ * `articles.approve` pipeline; `degraded=true` when the AI proxy fell back
+ * to its circuit-open response and the summary should be regenerated.
+ */
+export interface ArticleAi {
+  summary: string;
+  keywords: string[];
+  readingTimeMin: number;
+  ttsAudioUrl: string | null;
+  degraded: boolean;
+  /** Model identifier, e.g. `bart-large-cnn` or `circuit-open` on fallback. */
+  model: string;
+}
+
+export interface ArticleStats {
+  views: number;
+  uniqueReaders: number;
+  shares: number;
+  bookmarks: number;
+  commentsCount: number;
+  trendingScore: number;
+}
+
 export interface Article {
   id: string;
   title: string;
@@ -60,6 +98,12 @@ export interface Article {
 
   status: ArticleStatus;
   rejectionReason?: string | null;
+
+  /** Editorial placement flags. Populated for every doc; defaults are all-false / priority=0. */
+  placement?: ArticlePlacement;
+  /** AI enrichments. Populated lazily by the approve pipeline. */
+  ai?: ArticleAi;
+  stats?: ArticleStats;
 
   /** Optimistic-concurrency token — every PATCH must echo this back. */
   version: number;

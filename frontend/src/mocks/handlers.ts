@@ -253,10 +253,15 @@ export const handlers = [
   http.get(`${BASE}/articles`, ({ request }) => {
     const url = new URL(request.url);
     const status = url.searchParams.get('status');
-    const authorId = url.searchParams.get('authorId');
+    const authorIdParam = url.searchParams.get('authorId');
+    // `'me'` mirrors the real backend, which resolves it to the bearer's
+    // user id. In MSW we map it to the seeded mockUser. When no authorId
+    // is passed (e.g. the editor approval queue), the list is unscoped so
+    // every author's submissions surface — that's what an editor expects.
+    const authorId = authorIdParam === 'me' ? mockUserState.id : (authorIdParam ?? null);
     const items = mockDraftsState.filter((d) => {
       if (status && d.status !== status) return false;
-      if (authorId && authorId !== 'me' && d.authorId !== authorId) return false;
+      if (authorId && d.authorId !== authorId) return false;
       return true;
     });
     return ok({ items, total: items.length, page: 1, limit: 20 });
@@ -385,6 +390,144 @@ export const handlers = [
       ...article,
       status: 'submitted',
       submittedAt: new Date().toISOString(),
+      version: article.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    mockDraftsState = mockDraftsState.map((d, i) => (i === idx ? updated : d));
+    return ok({ article: updated });
+  }),
+
+  // POST /:id/approve — submitted → approved. Real backend also kicks off the
+  // AI pipeline + writes back `article.ai.*`; the mock omits that side-effect
+  // for now (FE-4b will mock the AI summary block separately).
+  http.post(`${BASE}/articles/:id/approve`, ({ params }) => {
+    const idx = mockDraftsState.findIndex((d) => d.id === params.id);
+    if (idx === -1) return err('NOT_FOUND', 'Article not found', 404);
+    const article = mockDraftsState[idx]!;
+    if (article.status !== 'submitted') {
+      return err('INVALID_STATE', `Cannot approve from ${article.status}`, 422);
+    }
+    const updated: (typeof mockDrafts)[number] = {
+      ...article,
+      status: 'approved',
+      approvedAt: new Date().toISOString(),
+      version: article.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    mockDraftsState = mockDraftsState.map((d, i) => (i === idx ? updated : d));
+    return ok({ article: updated });
+  }),
+
+  // POST /:id/reject — submitted → rejected. Persists `rejectionReason` so
+  // the author surface (FE Subphase 3) can render it on their submissions
+  // tracker. 10–500 char validation mirrors `backend/.../validator.ts`.
+  http.post(`${BASE}/articles/:id/reject`, async ({ request, params }) => {
+    const body = (await request.json()) as { rejectionReason?: string };
+    const idx = mockDraftsState.findIndex((d) => d.id === params.id);
+    if (idx === -1) return err('NOT_FOUND', 'Article not found', 404);
+    const article = mockDraftsState[idx]!;
+    if (article.status !== 'submitted') {
+      return err('INVALID_STATE', `Cannot reject from ${article.status}`, 422);
+    }
+    const reason = body.rejectionReason?.trim() ?? '';
+    if (reason.length < 10 || reason.length > 500) {
+      return err('VALIDATION_ERROR', 'Rejection reason must be 10–500 characters', 422, {
+        field: 'rejectionReason',
+      });
+    }
+    const updated: (typeof mockDrafts)[number] = {
+      ...article,
+      status: 'rejected',
+      rejectionReason: reason,
+      version: article.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    mockDraftsState = mockDraftsState.map((d, i) => (i === idx ? updated : d));
+    return ok({ article: updated });
+  }),
+
+  // POST /:id/publish — approved → published. Real backend invalidates Redis
+  // cache + indexes for search; mock just flips the status. publishedAt is
+  // set fresh so the resulting timestamp matches the action, not the prior
+  // approvedAt.
+  http.post(`${BASE}/articles/:id/publish`, ({ params }) => {
+    const idx = mockDraftsState.findIndex((d) => d.id === params.id);
+    if (idx === -1) return err('NOT_FOUND', 'Article not found', 404);
+    const article = mockDraftsState[idx]!;
+    if (article.status !== 'approved') {
+      return err('INVALID_STATE', `Cannot publish from ${article.status}`, 422);
+    }
+    const updated: (typeof mockDrafts)[number] = {
+      ...article,
+      status: 'published',
+      publishedAt: new Date().toISOString(),
+      version: article.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    mockDraftsState = mockDraftsState.map((d, i) => (i === idx ? updated : d));
+    return ok({ article: updated });
+  }),
+
+  // POST /:id/unpublish — published → unpublished. Admin-only on the real
+  // backend (403 FORBIDDEN for editors); the mock is permissive in dev so
+  // role-switching during demos doesn't require a fake bearer payload.
+  http.post(`${BASE}/articles/:id/unpublish`, ({ params }) => {
+    const idx = mockDraftsState.findIndex((d) => d.id === params.id);
+    if (idx === -1) return err('NOT_FOUND', 'Article not found', 404);
+    const article = mockDraftsState[idx]!;
+    if (article.status !== 'published') {
+      return err('INVALID_STATE', `Cannot unpublish from ${article.status}`, 422);
+    }
+    const updated: (typeof mockDrafts)[number] = {
+      ...article,
+      status: 'unpublished',
+      version: article.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    mockDraftsState = mockDraftsState.map((d, i) => (i === idx ? updated : d));
+    return ok({ article: updated });
+  }),
+
+  // PATCH /:id/placement — editorial-surface flags + priority for published
+  // articles. Optimistic concurrency on `version` mirrors the draft PATCH
+  // handler so VERSION_CONFLICT exercises in MSW match the real backend.
+  http.patch(`${BASE}/articles/:id/placement`, async ({ request, params }) => {
+    const body = (await request.json()) as {
+      featured?: boolean;
+      trending?: boolean;
+      trail?: boolean;
+      priority?: number;
+      version?: number;
+    };
+    const idx = mockDraftsState.findIndex((d) => d.id === params.id);
+    if (idx === -1) return err('NOT_FOUND', 'Article not found', 404);
+    const article = mockDraftsState[idx]!;
+    if (article.status !== 'published') {
+      return err(
+        'INVALID_STATE',
+        `Placement requires a published article (was ${article.status})`,
+        422,
+      );
+    }
+    if (typeof body.version !== 'number' || body.version !== article.version) {
+      return err('VERSION_CONFLICT', 'Stale version', 409, {
+        currentVersion: article.version,
+      });
+    }
+    const currentPlacement = article.placement ?? {
+      featured: false,
+      trending: false,
+      trail: false,
+      priority: 0,
+    };
+    const updated: (typeof mockDrafts)[number] = {
+      ...article,
+      placement: {
+        featured: body.featured ?? currentPlacement.featured,
+        trending: body.trending ?? currentPlacement.trending,
+        trail: body.trail ?? currentPlacement.trail,
+        priority: body.priority ?? currentPlacement.priority,
+      },
       version: article.version + 1,
       updatedAt: new Date().toISOString(),
     };
