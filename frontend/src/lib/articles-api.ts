@@ -1,5 +1,10 @@
 import { apiClient } from './api-client';
-import type { CreateDraftInput, UpdateDraftInput } from './articles-schema';
+import type {
+  CreateDraftInput,
+  PlacementInput,
+  RejectArticleInput,
+  UpdateDraftInput,
+} from './articles-schema';
 import type { ApiSuccess } from '@/types/api';
 import type { Article, ArticleStatus } from '@/types/article';
 
@@ -69,4 +74,71 @@ export async function submitForReview(id: string): Promise<Article> {
 /** `DELETE /v1/articles/:id` — soft-delete (owner/editor/admin). */
 export async function deleteArticle(id: string): Promise<void> {
   await apiClient.delete(`/articles/${id}`);
+}
+
+// ─── Editorial lifecycle (Subphase 4) ───────────────────────────────────
+//
+// Approve / reject / publish / unpublish all handle optimistic concurrency
+// server-side — no `version` in the body. Placement DOES require version
+// because placement edits race with publish/unpublish + with concurrent
+// editors. Backend returns the updated article on every action; we return
+// it so callers can hand the fresh object back to the cache.
+
+/**
+ * `GET /v1/articles?status=submitted` — convenience wrapper for the
+ * approvals queue. Backend authoritatively scopes editors to their
+ * `sectionsOwned`; admins see all.
+ */
+export async function listSubmittedArticles(
+  query: Omit<ListArticlesQuery, 'status'> = {},
+): Promise<ArticlesListResult> {
+  return listArticles({ ...query, status: 'submitted' });
+}
+
+/** `POST /v1/articles/:id/approve` — fires the AI pipeline on success. */
+export async function approveArticle(id: string): Promise<Article> {
+  const res = await apiClient.post<ApiSuccess<{ article: Article }>>(`/articles/${id}/approve`);
+  return res.data.data.article;
+}
+
+/**
+ * `POST /v1/articles/:id/reject` — notifies the author with the reason.
+ * Reason: 10–500 chars (validated client-side via `rejectArticleSchema`).
+ */
+export async function rejectArticle(id: string, body: RejectArticleInput): Promise<Article> {
+  const res = await apiClient.post<ApiSuccess<{ article: Article }>>(
+    `/articles/${id}/reject`,
+    body,
+  );
+  return res.data.data.article;
+}
+
+/** `POST /v1/articles/:id/publish` — flips approved → published. */
+export async function publishArticle(id: string): Promise<Article> {
+  const res = await apiClient.post<ApiSuccess<{ article: Article }>>(`/articles/${id}/publish`);
+  return res.data.data.article;
+}
+
+/** `POST /v1/articles/:id/unpublish` — admin only; reverts to unpublished. */
+export async function unpublishArticle(id: string): Promise<Article> {
+  const res = await apiClient.post<ApiSuccess<{ article: Article }>>(
+    `/articles/${id}/unpublish`,
+  );
+  return res.data.data.article;
+}
+
+/**
+ * `PATCH /v1/articles/:id/placement` — sets featured/trending/trail/priority
+ * on a published article. `version` is required for OCC; on stale version
+ * the backend returns `409 VERSION_CONFLICT` with `details.currentVersion`.
+ */
+export async function updateArticlePlacement(
+  id: string,
+  body: PlacementInput,
+): Promise<Article> {
+  const res = await apiClient.patch<ApiSuccess<{ article: Article }>>(
+    `/articles/${id}/placement`,
+    body,
+  );
+  return res.data.data.article;
 }

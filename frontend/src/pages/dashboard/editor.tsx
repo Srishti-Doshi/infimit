@@ -1,11 +1,17 @@
-import { PlaceholderPage } from '@/components/placeholder-page';
+import { Navigate } from 'react-router-dom';
 
+/**
+ * `/dashboard/editor` — landing redirect.
+ *
+ * Editors don't really have a "home" page distinct from their workflow —
+ * `/approvals` IS the landing. Keeping the explicit redirect (vs. mounting
+ * `<ApprovalsPage>` here directly) means the URL the user sees matches the
+ * surface they're on, which makes nav highlighting + analytics cleaner.
+ *
+ * Future polish: a real dashboard with counters (pending approvals,
+ * pending comments) — punted to Subphase 5 along with the rest of the
+ * dashboard chrome work.
+ */
 export default function EditorDashboardPage(): JSX.Element {
-  return (
-    <PlaceholderPage
-      name="Editor dashboard"
-      subphase={3}
-      description="Editorial review, approval queue, and Tiptap-based content editing arrive in Subphase 3."
-    />
-  );
+  return <Navigate to="/dashboard/editor/approvals" replace />;
 }

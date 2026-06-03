@@ -29,9 +29,12 @@ const NewDraftPage = lazy(() => import('@/pages/dashboard/author/drafts/new'));
 const EditDraftPage = lazy(() => import('@/pages/dashboard/author/drafts/edit'));
 const SubmissionsPage = lazy(() => import('@/pages/dashboard/author/submissions'));
 const EditorDashboardPage = lazy(() => import('@/pages/dashboard/editor'));
+const ApprovalsPage = lazy(() => import('@/pages/dashboard/editor/approvals'));
+const ApprovalPreviewPage = lazy(() => import('@/pages/dashboard/editor/approvals/preview'));
 const AdminLandingPage = lazy(() => import('@/pages/dashboard/admin'));
 const AdminEditorsPage = lazy(() => import('@/pages/dashboard/admin/editors'));
 const AdminOrganisationsPage = lazy(() => import('@/pages/dashboard/admin/organisations'));
+const AdminApprovalsPage = lazy(() => import('@/pages/dashboard/admin/approvals'));
 
 function RouteFallback(): JSX.Element {
   return (
@@ -104,7 +107,11 @@ const router = createBrowserRouter(
             },
             {
               element: <RequireRole roles={['editor', 'admin']} />,
-              children: [{ path: 'dashboard/editor/*', element: <EditorDashboardPage /> }],
+              children: [
+                { path: 'dashboard/editor', element: <EditorDashboardPage /> },
+                { path: 'dashboard/editor/approvals', element: <ApprovalsPage /> },
+                { path: 'dashboard/editor/approvals/:id', element: <ApprovalPreviewPage /> },
+              ],
             },
             {
               element: <RequireRole roles={['admin']} />,
@@ -112,6 +119,7 @@ const router = createBrowserRouter(
                 { path: 'dashboard/admin', element: <AdminLandingPage /> },
                 { path: 'dashboard/admin/editors', element: <AdminEditorsPage /> },
                 { path: 'dashboard/admin/organisations', element: <AdminOrganisationsPage /> },
+                { path: 'dashboard/admin/approvals', element: <AdminApprovalsPage /> },
               ],
             },
           ],
