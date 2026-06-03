@@ -6,6 +6,7 @@
  * Subphase 2+. Keep fixtures intentionally thin so they're easy to swap.
  */
 import type { Article } from '@/types/article';
+import type { Comment } from '@/types/comment';
 
 export const mockUser = {
   id: 'usr_demo_001',
@@ -262,24 +263,70 @@ export const mockDrafts: Article[] = [
   },
 ];
 
-export const mockComments = [
+/**
+ * Subphase 4 comments — match the real `Comment` wire shape
+ * (`types/comment.ts`). Mix of approved + pending tied to actual articles
+ * in `mockDrafts` so the editor thread (FE-4c) and moderation queue have
+ * meaningful content in dev. The legacy `rating` field from earlier
+ * subphases was dropped — backend has no such concept.
+ */
+export const mockComments: Comment[] = [
+  // Approved comments on the published article — surface in <CommentThread>.
   {
     id: 'cmt_001',
-    articleId: 'art_demo_001',
-    author: { id: 'usr_rahul', name: 'Rahul' },
-    body: 'This is very informative news. Thanks for sharing!',
-    rating: 4,
+    articleId: 'art_published_001',
+    userId: 'usr_rahul',
+    author: { id: 'usr_rahul', name: 'Rahul Verma' },
+    parentId: null,
+    body: 'Really helpful breakdown of the enrollment shifts — the dropout-signal data was new to me.',
     status: 'approved',
-    createdAt: '2026-05-11T07:30:00.000Z',
+    createdAt: '2026-05-23T08:30:00.000Z',
+    updatedAt: '2026-05-23T08:30:00.000Z',
   },
   {
     id: 'cmt_002',
-    articleId: 'art_demo_001',
-    author: { id: 'usr_anjali', name: 'Anjali' },
-    body: 'Great update. Looking forward to more such news.',
-    rating: 5,
+    articleId: 'art_published_001',
+    userId: 'usr_anjali',
+    author: { id: 'usr_anjali', name: 'Anjali Singh' },
+    parentId: null,
+    body: 'Looking forward to the follow-up survey. Any chance you’ll share the per-institution numbers?',
     status: 'approved',
-    createdAt: '2026-05-11T09:12:00.000Z',
+    createdAt: '2026-05-23T09:12:00.000Z',
+    updatedAt: '2026-05-23T09:12:00.000Z',
+  },
+  // Pending comments — populate the moderation queue at /dashboard/editor/comments/pending.
+  {
+    id: 'cmt_003',
+    articleId: 'art_published_001',
+    userId: 'usr_tarun',
+    author: { id: 'usr_tarun', name: 'Tarun Mehta' },
+    parentId: null,
+    body: 'Disagree with the methodology — your sample skews urban. Curious how this would shape up across tier-2 institutions.',
+    status: 'pending',
+    createdAt: '2026-06-02T14:00:00.000Z',
+    updatedAt: '2026-06-02T14:00:00.000Z',
+  },
+  {
+    id: 'cmt_004',
+    articleId: 'art_published_001',
+    userId: 'usr_nikhil',
+    author: { id: 'usr_nikhil', name: 'Nikhil Patel' },
+    parentId: null,
+    body: 'Great piece. One nit: the chart on page 3 has a typo in the y-axis label.',
+    status: 'pending',
+    createdAt: '2026-06-02T15:30:00.000Z',
+    updatedAt: '2026-06-02T15:30:00.000Z',
+  },
+  {
+    id: 'cmt_005',
+    articleId: 'art_submitted_001',
+    userId: 'usr_priya',
+    author: { id: 'usr_priya', name: 'Priya Iyer' },
+    parentId: null,
+    body: 'Even before this is live I think the framing needs a closer look — the NIRF change isn’t as clean as the lede suggests.',
+    status: 'pending',
+    createdAt: '2026-06-03T10:00:00.000Z',
+    updatedAt: '2026-06-03T10:00:00.000Z',
   },
 ];
 
