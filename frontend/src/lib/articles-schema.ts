@@ -83,6 +83,45 @@ export const updateDraftSchema = z
 export type UpdateDraftInput = z.infer<typeof updateDraftSchema>;
 
 /**
+ * `POST /v1/articles/:id/reject` body — editor / admin rejects a submitted
+ * article. The reason becomes a notification to the author, so the floor is
+ * 10 chars (discourage drive-by "no"s) and the ceiling 500 (keep the
+ * notification body manageable).
+ *
+ * Wire-shape note: the backend field is `rejectionReason`, NOT `reason` —
+ * matches the persisted column on the article doc.
+ */
+export const rejectArticleSchema = z.object({
+  rejectionReason: z
+    .string()
+    .trim()
+    .min(10, 'Rejection reason must be at least 10 characters')
+    .max(500, 'Rejection reason must be at most 500 characters'),
+});
+export type RejectArticleInput = z.infer<typeof rejectArticleSchema>;
+
+/**
+ * `PATCH /v1/articles/:id/placement` body — placement flags + priority for
+ * a published article. `version` is required for optimistic concurrency
+ * (placement edits race with publish/unpublish + with other editors).
+ *
+ * The refine matches the backend rule: at least one mutable field beyond
+ * `version` must be present.
+ */
+export const placementSchema = z
+  .object({
+    featured: z.boolean().optional(),
+    trending: z.boolean().optional(),
+    trail: z.boolean().optional(),
+    priority: z.coerce.number().int().min(0).max(100).optional(),
+    version: z.number().int().nonnegative(),
+  })
+  .refine((data) => Object.keys(data).some((k) => k !== 'version'), {
+    message: 'At least one placement field must change',
+  });
+export type PlacementInput = z.infer<typeof placementSchema>;
+
+/**
  * Submit-readiness checklist. Renders directly as the validation sidebar; the
  * "Submit" CTA is enabled iff every flag is true.
  */
