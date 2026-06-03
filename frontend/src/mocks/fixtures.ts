@@ -7,6 +7,7 @@
  */
 import type { Article } from '@/types/article';
 import type { Comment } from '@/types/comment';
+import type { Epaper } from '@/types/epaper';
 import type { Notification } from '@/types/notification';
 
 export const mockUser = {
@@ -389,11 +390,37 @@ export const mockTags = [
   { id: 'tag_policy', slug: 'policy', name: 'Policy' },
 ];
 
-export const mockEpaperIssues = [
+/**
+ * Subphase 4 e-paper issues — match the real `Epaper` wire shape
+ * (`types/epaper.ts`). Renamed semantically from the Subphase 1 placeholder
+ * (`pdfUrl` + `publishedAt`) to the real model fields (`pdfMediaId`,
+ * `coverMediaId`, `issueDate`, `stats`).
+ */
+export const mockEpaperIssues: Epaper[] = [
   {
-    id: 'epp_2026_05_18',
-    publishedAt: '2026-05-18T05:00:00.000Z',
-    title: 'Saturday Edition · 18 May 2026',
-    pdfUrl: null,
+    id: 'epp_2026_05_30',
+    title: 'Morning Edition — 30 May 2026',
+    issueDate: '2026-05-30T00:00:00.000Z',
+    pdfMediaId: '6a2100000000000000000001',
+    coverMediaId: '6a2100000000000000000002',
+    coverImageUrl: 'https://cdn.example.com/epapers/2026-05-30-cover.jpg',
+    pageCount: 16,
+    uploadedBy: 'usr_demo_001',
+    stats: { downloads: 47, views: 312 },
+    createdAt: '2026-05-30T06:00:00.000Z',
+    updatedAt: '2026-05-30T06:00:00.000Z',
+  },
+  {
+    id: 'epp_2026_05_23',
+    title: 'Weekly Digest — 23 May 2026',
+    issueDate: '2026-05-23T00:00:00.000Z',
+    pdfMediaId: '6a2100000000000000000003',
+    coverMediaId: '6a2100000000000000000004',
+    coverImageUrl: 'https://cdn.example.com/epapers/2026-05-23-cover.jpg',
+    pageCount: 24,
+    uploadedBy: 'usr_demo_001',
+    stats: { downloads: 128, views: 894 },
+    createdAt: '2026-05-23T06:00:00.000Z',
+    updatedAt: '2026-05-23T06:00:00.000Z',
   },
 ];
