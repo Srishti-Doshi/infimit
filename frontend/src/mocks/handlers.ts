@@ -88,6 +88,35 @@ let nextOrgId = 100;
 let mockDraftsState: Array<(typeof mockDrafts)[number]> = [...mockDrafts];
 let nextDraftId = 100;
 
+/**
+ * Mutable comments list — Subphase 4 moderation queue + thread post both
+ * mutate this in place per session. Reset on `__resetMocks`.
+ */
+let mockCommentsState: Array<(typeof mockComments)[number]> = [...mockComments];
+let nextCommentId = 100;
+
+/**
+ * Single-row moderation helper used by the three comment-action handlers
+ * (approve / reject / hide). Returns the same response envelope the real
+ * backend does, including `moderatedBy` / `moderatedAt` provenance fields
+ * so the FE can render them later if needed.
+ */
+function moderate(id: string, next: 'approved' | 'rejected' | 'hidden'): Response {
+  const idx = mockCommentsState.findIndex((c) => c.id === id);
+  if (idx === -1) return err('NOT_FOUND', 'Comment not found', 404);
+  const current = mockCommentsState[idx]!;
+  const now = new Date().toISOString();
+  const updated = {
+    ...current,
+    status: next,
+    moderatedBy: mockUserState.id,
+    moderatedAt: now,
+    updatedAt: now,
+  };
+  mockCommentsState = mockCommentsState.map((c, i) => (i === idx ? updated : c));
+  return HttpResponse.json({ success: true, data: { comment: updated } });
+}
+
 function hasBearer(request: Request): boolean {
   return Boolean(request.headers.get('authorization'));
 }
@@ -113,6 +142,8 @@ export function __resetMocks(): void {
   nextOrgId = 100;
   mockDraftsState = [...mockDrafts];
   nextDraftId = 100;
+  mockCommentsState = [...mockComments];
+  nextCommentId = 100;
 }
 
 /**
@@ -596,12 +627,79 @@ export const handlers = [
   }),
 
   // ── Comments ───────────────────────────────────────────────────────────
-  http.get(`${BASE}/articles/:articleId/comments`, ({ params }) =>
-    ok(mockComments.filter((c) => c.articleId === params.articleId)),
+
+  // GET /articles/:articleId/comments — approved only. Backend authoritatively
+  // enforces the status filter regardless of query params; we mirror that.
+  // `article` projection is omitted here (the FE knows the article already).
+  http.get(`${BASE}/articles/:articleId/comments`, ({ params }) => {
+    const items = mockCommentsState.filter(
+      (c) => c.articleId === params.articleId && c.status === 'approved',
+    );
+    return ok({ items, total: items.length, page: 1, limit: 20 });
+  }),
+
+  // POST /articles/:articleId/comments — authed; new comment lands `pending`.
+  // Mock stays permissive on bearer (matches the rest of this file in dev),
+  // and validates length client-side via `postCommentSchema`. Backend would
+  // enforce both server-side.
+  http.post(`${BASE}/articles/:articleId/comments`, async ({ request, params }) => {
+    const articleId = String(params.articleId);
+    const body = (await request.json()) as { body?: string; parentId?: string | null };
+    const text = body.body?.trim() ?? '';
+    if (text.length < 1 || text.length > 2000) {
+      return err('VALIDATION_ERROR', 'Comment must be 1-2000 characters', 422, {
+        field: 'body',
+      });
+    }
+    const now = new Date().toISOString();
+    nextCommentId += 1;
+    const newComment = {
+      id: `cmt_${nextCommentId.toString().padStart(3, '0')}`,
+      articleId,
+      userId: mockUserState.id,
+      author: { id: mockUserState.id, name: mockUserState.name },
+      parentId: body.parentId ?? null,
+      body: text,
+      status: 'pending' as const,
+      createdAt: now,
+      updatedAt: now,
+    };
+    mockCommentsState = [newComment, ...mockCommentsState];
+    return HttpResponse.json({ success: true, data: { comment: newComment } }, { status: 201 });
+  }),
+
+  // GET /comments/pending — moderation queue (editor/admin only on real backend).
+  // Mock returns `pending` comments WITH the `article` projection so the
+  // moderation table can link back to the source article.
+  http.get(`${BASE}/comments/pending`, () => {
+    const items = mockCommentsState
+      .filter((c) => c.status === 'pending')
+      .map((c) => {
+        const article = mockDraftsState.find((a) => a.id === c.articleId);
+        return article
+          ? { ...c, article: { id: article.id, title: article.title, slug: article.slug } }
+          : c;
+      });
+    return ok({ items, total: items.length, page: 1, limit: 20 });
+  }),
+
+  // POST /comments/:id/approve|reject|hide — single moderation actions. Mock
+  // is permissive on RBAC; real backend gates editor/admin. `String(params.id)`
+  // coerces the MSW path-param union (`string | readonly string[] | undefined`)
+  // down to the single string we know it always is for this route.
+  http.post(`${BASE}/comments/:id/approve`, ({ params }) =>
+    moderate(String(params.id), 'approved'),
   ),
-  http.post(`${BASE}/articles/:articleId/comments`, () =>
-    err('UNAUTHORIZED', 'Sign in to comment', 401),
-  ),
+  http.post(`${BASE}/comments/:id/reject`, ({ params }) => moderate(String(params.id), 'rejected')),
+  http.post(`${BASE}/comments/:id/hide`, ({ params }) => moderate(String(params.id), 'hidden')),
+
+  // DELETE /comments/:id — owner OR editor/admin.
+  http.delete(`${BASE}/comments/:id`, ({ params }) => {
+    const idx = mockCommentsState.findIndex((c) => c.id === params.id);
+    if (idx === -1) return err('NOT_FOUND', 'Comment not found', 404);
+    mockCommentsState = mockCommentsState.filter((_, i) => i !== idx);
+    return new HttpResponse(null, { status: 204 });
+  }),
 
   // ── Tags ────────────────────────────────────────────────────────────────
   http.get(`${BASE}/tags`, () => ok(mockTags)),
