@@ -56,7 +56,44 @@ async function seedUser(role: UserRole): Promise<SeededUser> {
   return { id: user._id.toString(), email, token, role };
 }
 
-/** Let event listeners' async writes complete. */
+/**
+ * Poll until a predicate is satisfied, or fail after `timeout` ms.
+ *
+ * Event listeners write notifications asynchronously — the `void
+ * persistSafely(async () => ...)` pattern emits and forgets. A fixed
+ * `setImmediate` wait passes locally but races on a loaded CI runner
+ * because the Mongoose `.create()` chain involves microtasks PLUS I/O
+ * to mongo-memory-server. This polls every 25ms up to a 2s ceiling,
+ * which is comfortably under Jest's per-test timeout and short enough
+ * that the suite stays fast when the listener is quick (the common case).
+ *
+ * Use this for assertion-of-presence ("expect a notification to appear").
+ * Assertion-of-absence is unchanged — see the `does NOT notify` test
+ * below which still relies on `flushAsync`.
+ */
+async function waitFor<T>(
+  query: () => Promise<T>,
+  predicate: (result: T) => boolean,
+  { timeout = 2000, interval = 25 }: { timeout?: number; interval?: number } = {},
+): Promise<T> {
+  const deadline = Date.now() + timeout;
+  let last: T = await query();
+  while (!predicate(last)) {
+    if (Date.now() >= deadline) {
+      throw new Error(`waitFor timed out after ${timeout}ms — predicate never satisfied`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, interval));
+    last = await query();
+  }
+  return last;
+}
+
+/**
+ * Fixed-wait fallback for assertion-of-absence — kept because polling
+ * is no help when the expected outcome IS "nothing happened". Two
+ * setImmediate cycles is enough to drain the synchronous listener
+ * callback before we count documents.
+ */
 async function flushAsync(): Promise<void> {
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
@@ -86,9 +123,11 @@ describe('notification listeners (event-driven creation)', () => {
       editorId: new Types.ObjectId().toString(),
       category: 'campus_news',
     });
-    await flushAsync();
 
-    const notifs = await Notification.find({ userId: author.id }).exec();
+    const notifs = await waitFor(
+      () => Notification.find({ userId: author.id }).exec(),
+      (xs) => xs.length >= 1,
+    );
     expect(notifs).toHaveLength(1);
     expect(notifs[0]?.type).toBe('article_approved');
     expect(notifs[0]?.read).toBe(false);
@@ -104,14 +143,13 @@ describe('notification listeners (event-driven creation)', () => {
       category: 'research_innovation',
       rejectionReason: reason,
     });
-    await flushAsync();
 
-    const notif = await Notification.findOne({
-      userId: author.id,
-      type: 'article_rejected',
-    }).exec();
-    expect(notif?.body).toBe(reason);
-    expect((notif?.metadata as { rejectionReason: string }).rejectionReason).toBe(reason);
+    const notif = (await waitFor(
+      () => Notification.findOne({ userId: author.id, type: 'article_rejected' }).exec(),
+      (n) => n !== null,
+    ))!;
+    expect(notif.body).toBe(reason);
+    expect((notif.metadata as { rejectionReason: string }).rejectionReason).toBe(reason);
   });
 
   it('article.published → article_published notification (P1: author only)', async () => {
@@ -123,14 +161,12 @@ describe('notification listeners (event-driven creation)', () => {
       category: 'tech_in_education',
       slug: 'some-slug',
     });
-    await flushAsync();
 
-    const notif = await Notification.findOne({
-      userId: author.id,
-      type: 'article_published',
-    }).exec();
-    expect(notif).toBeTruthy();
-    expect(notif?.link).toContain('/articles/slug/some-slug');
+    const notif = (await waitFor(
+      () => Notification.findOne({ userId: author.id, type: 'article_published' }).exec(),
+      (n) => n !== null,
+    ))!;
+    expect(notif.link).toContain('/articles/slug/some-slug');
   });
 
   it('article.unpublished → notifies the author with the slug', async () => {
@@ -142,12 +178,11 @@ describe('notification listeners (event-driven creation)', () => {
       category: 'campus_news',
       slug: 'taken-down',
     });
-    await flushAsync();
 
-    const notif = await Notification.findOne({
-      userId: author.id,
-      type: 'article_unpublished',
-    }).exec();
+    const notif = await waitFor(
+      () => Notification.findOne({ userId: author.id, type: 'article_unpublished' }).exec(),
+      (n) => n !== null,
+    );
     expect(notif).toBeTruthy();
   });
 
@@ -164,12 +199,13 @@ describe('notification listeners (event-driven creation)', () => {
       commenterId: commenter.id,
       commenterName: 'Reader Renee',
     });
-    await flushAsync();
 
-    const notif = await Notification.findOne({ userId: author.id, type: 'new_comment' }).exec();
-    expect(notif).toBeTruthy();
-    expect(notif?.body).toContain('Reader Renee');
-    expect((notif?.metadata as { commentId: string }).commentId).toBe(commentId);
+    const notif = (await waitFor(
+      () => Notification.findOne({ userId: author.id, type: 'new_comment' }).exec(),
+      (n) => n !== null,
+    ))!;
+    expect(notif.body).toContain('Reader Renee');
+    expect((notif.metadata as { commentId: string }).commentId).toBe(commentId);
   });
 
   it('comment.approved does NOT notify when the author commented on their own piece', async () => {

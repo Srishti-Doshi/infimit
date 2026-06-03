@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { ArticleStatusBadge } from '@/components/article-status-badge';
+import { AISummaryBlock } from '@/components/editor/ai-summary-block';
 import { PlacementPanel } from '@/components/editor/placement-panel';
 import { RejectModal } from '@/components/editor/reject-modal';
 import { Button, Card, CardBody, Container, EmptyState, Skeleton, toast } from '@/components/ui';
@@ -238,6 +239,9 @@ export default function ApprovalPreviewPage(): JSX.Element {
           className="mt-6 aspect-[16/9] w-full rounded-lg object-cover"
         />
       ) : null}
+
+      {/* ─── AI summary (approved/published/unpublished, when AI ran) ─ */}
+      <AISummaryBlock article={article} />
 
       {/* ─── Editorial placement (published-only) ───────────────────── */}
       <PlacementPanel article={article} />
