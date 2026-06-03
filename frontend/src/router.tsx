@@ -23,6 +23,7 @@ const ResetPasswordPage = lazy(() => import('@/pages/auth/reset-password'));
 const VerifyEmailPage = lazy(() => import('@/pages/auth/verify-email'));
 
 const ProfilePage = lazy(() => import('@/pages/dashboard/me'));
+const NotificationsPage = lazy(() => import('@/pages/dashboard/notifications'));
 const ReaderDashboardPage = lazy(() => import('@/pages/dashboard/reader'));
 const DraftsPage = lazy(() => import('@/pages/dashboard/author/drafts'));
 const NewDraftPage = lazy(() => import('@/pages/dashboard/author/drafts/new'));
@@ -91,6 +92,7 @@ const router = createBrowserRouter(
           element: <RequireAuth />,
           children: [
             { path: 'dashboard/me', element: <ProfilePage /> },
+            { path: 'dashboard/notifications', element: <NotificationsPage /> },
             { path: 'dashboard/reader/*', element: <ReaderDashboardPage /> },
             {
               element: <RequireRole roles={['author', 'editor', 'admin']} />,

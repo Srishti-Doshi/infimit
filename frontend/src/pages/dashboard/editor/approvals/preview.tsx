@@ -8,6 +8,7 @@ import { AISummaryBlock } from '@/components/editor/ai-summary-block';
 import { CommentThread } from '@/components/editor/comment-thread';
 import { PlacementPanel } from '@/components/editor/placement-panel';
 import { RejectModal } from '@/components/editor/reject-modal';
+import { SanitizedHtml } from '@/components/sanitized-html';
 import { Button, Card, CardBody, Container, EmptyState, Skeleton, toast } from '@/components/ui';
 import {
   approveArticle,
@@ -251,12 +252,7 @@ export default function ApprovalPreviewPage(): JSX.Element {
       <Card className="mt-8">
         <CardBody>
           {article.body ? (
-            <article
-              className="prose max-w-none"
-              // Body is backend-sanitized server-side on every save.
-              // TODO(dompurify): re-sanitize on render once the dep lands in FE-4d.
-              dangerouslySetInnerHTML={{ __html: article.body }}
-            />
+            <SanitizedHtml html={article.body} />
           ) : (
             <p className="text-body-base italic text-ink-tertiary">
               This submission has no body content.
