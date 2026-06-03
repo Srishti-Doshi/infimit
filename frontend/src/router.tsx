@@ -146,4 +146,3 @@ const router = createBrowserRouter(
 export function Router(): JSX.Element {
   return <RouterProvider router={router} future={{ v7_startTransition: true }} />;
 }
-
