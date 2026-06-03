@@ -121,9 +121,7 @@ export async function publishArticle(id: string): Promise<Article> {
 
 /** `POST /v1/articles/:id/unpublish` — admin only; reverts to unpublished. */
 export async function unpublishArticle(id: string): Promise<Article> {
-  const res = await apiClient.post<ApiSuccess<{ article: Article }>>(
-    `/articles/${id}/unpublish`,
-  );
+  const res = await apiClient.post<ApiSuccess<{ article: Article }>>(`/articles/${id}/unpublish`);
   return res.data.data.article;
 }
 
@@ -132,10 +130,7 @@ export async function unpublishArticle(id: string): Promise<Article> {
  * on a published article. `version` is required for OCC; on stale version
  * the backend returns `409 VERSION_CONFLICT` with `details.currentVersion`.
  */
-export async function updateArticlePlacement(
-  id: string,
-  body: PlacementInput,
-): Promise<Article> {
+export async function updateArticlePlacement(id: string, body: PlacementInput): Promise<Article> {
   const res = await apiClient.patch<ApiSuccess<{ article: Article }>>(
     `/articles/${id}/placement`,
     body,

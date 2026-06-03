@@ -258,8 +258,7 @@ export const handlers = [
     // user id. In MSW we map it to the seeded mockUser. When no authorId
     // is passed (e.g. the editor approval queue), the list is unscoped so
     // every author's submissions surface — that's what an editor expects.
-    const authorId =
-      authorIdParam === 'me' ? mockUserState.id : (authorIdParam ?? null);
+    const authorId = authorIdParam === 'me' ? mockUserState.id : (authorIdParam ?? null);
     const items = mockDraftsState.filter((d) => {
       if (status && d.status !== status) return false;
       if (authorId && d.authorId !== authorId) return false;
@@ -504,7 +503,11 @@ export const handlers = [
     if (idx === -1) return err('NOT_FOUND', 'Article not found', 404);
     const article = mockDraftsState[idx]!;
     if (article.status !== 'published') {
-      return err('INVALID_STATE', `Placement requires a published article (was ${article.status})`, 422);
+      return err(
+        'INVALID_STATE',
+        `Placement requires a published article (was ${article.status})`,
+        422,
+      );
     }
     if (typeof body.version !== 'number' || body.version !== article.version) {
       return err('VERSION_CONFLICT', 'Stale version', 409, {

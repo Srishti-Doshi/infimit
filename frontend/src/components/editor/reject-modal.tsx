@@ -88,8 +88,8 @@ export function RejectModal({
         <ModalHeader>
           <ModalTitle>Reject submission</ModalTitle>
           <ModalDescription>
-            The author of <span className="font-medium text-ink-primary">{articleTitle}</span>{' '}
-            will see this reason. Be specific — they&rsquo;ll act on it when revising.
+            The author of <span className="font-medium text-ink-primary">{articleTitle}</span> will
+            see this reason. Be specific — they&rsquo;ll act on it when revising.
           </ModalDescription>
         </ModalHeader>
         <ModalBody>

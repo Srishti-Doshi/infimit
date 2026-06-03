@@ -34,15 +34,11 @@ export function ApprovalQueueRow({ article }: { article: Article }): JSX.Element
           <p className="mt-1 text-body-sm text-ink-tertiary line-clamp-1">{article.subtitle}</p>
         ) : null}
       </td>
-      <td className="px-4 py-3 text-body-sm text-ink-secondary">
-        {article.author?.name ?? '—'}
-      </td>
+      <td className="px-4 py-3 text-body-sm text-ink-secondary">{article.author?.name ?? '—'}</td>
       <td className="px-4 py-3 text-body-sm text-ink-secondary">
         {ARTICLE_CATEGORY_LABELS[article.category]}
       </td>
-      <td className="px-4 py-3 text-body-sm text-ink-tertiary">
-        {relativeTime(submittedIso)}
-      </td>
+      <td className="px-4 py-3 text-body-sm text-ink-tertiary">{relativeTime(submittedIso)}</td>
       <td className="px-4 py-3">
         <ArticleStatusBadge status={article.status} />
       </td>

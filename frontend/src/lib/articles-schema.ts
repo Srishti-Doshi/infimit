@@ -116,10 +116,9 @@ export const placementSchema = z
     priority: z.coerce.number().int().min(0).max(100).optional(),
     version: z.number().int().nonnegative(),
   })
-  .refine(
-    (data) => Object.keys(data).some((k) => k !== 'version'),
-    { message: 'At least one placement field must change' },
-  );
+  .refine((data) => Object.keys(data).some((k) => k !== 'version'), {
+    message: 'At least one placement field must change',
+  });
 export type PlacementInput = z.infer<typeof placementSchema>;
 
 /**

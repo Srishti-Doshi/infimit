@@ -6,15 +6,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArticleStatusBadge } from '@/components/article-status-badge';
 import { PlacementPanel } from '@/components/editor/placement-panel';
 import { RejectModal } from '@/components/editor/reject-modal';
-import {
-  Button,
-  Card,
-  CardBody,
-  Container,
-  EmptyState,
-  Skeleton,
-  toast,
-} from '@/components/ui';
+import { Button, Card, CardBody, Container, EmptyState, Skeleton, toast } from '@/components/ui';
 import {
   approveArticle,
   getArticle,
@@ -55,7 +47,11 @@ export default function ApprovalPreviewPage(): JSX.Element {
   const user = useAuthStore((s) => s.user);
   const [rejectOpen, setRejectOpen] = useState(false);
 
-  const { data: article, isLoading, isError } = useQuery({
+  const {
+    data: article,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ['articles', id],
     queryFn: () => getArticle(id),
     enabled: id.length > 0,

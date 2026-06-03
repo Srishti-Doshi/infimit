@@ -134,8 +134,7 @@ function PlacementPanelInner({ article }: PlacementPanelProps): JSX.Element {
               Editorial placement
             </h2>
             <p className="mt-0.5 text-body-sm text-ink-secondary">
-              Featured / trending / trail flags + priority.{' '}
-              <PlacementSummary placement={local} />
+              Featured / trending / trail flags + priority. <PlacementSummary placement={local} />
             </p>
           </div>
           {open ? (
