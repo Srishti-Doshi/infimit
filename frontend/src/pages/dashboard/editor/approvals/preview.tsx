@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { ArticleStatusBadge } from '@/components/article-status-badge';
 import { AISummaryBlock } from '@/components/editor/ai-summary-block';
+import { CommentThread } from '@/components/editor/comment-thread';
 import { PlacementPanel } from '@/components/editor/placement-panel';
 import { RejectModal } from '@/components/editor/reject-modal';
 import { Button, Card, CardBody, Container, EmptyState, Skeleton, toast } from '@/components/ui';
@@ -263,6 +264,9 @@ export default function ApprovalPreviewPage(): JSX.Element {
           )}
         </CardBody>
       </Card>
+
+      {/* ─── Comments thread ─────────────────────────────────────────── */}
+      <CommentThread articleId={article.id} />
 
       <RejectModal
         open={rejectOpen}
