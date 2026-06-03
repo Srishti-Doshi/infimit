@@ -137,3 +137,21 @@ export async function updateArticlePlacement(id: string, body: PlacementInput): 
   );
   return res.data.data.article;
 }
+
+/**
+ * `POST /v1/articles/:id/ai/summary` — force-regenerate the AI summary.
+ *
+ * Body carries `{ force: true }` by default (the only mode used in
+ * Subphase 4). The backend re-runs the AI pipeline (opossum-gated) and
+ * persists the result on `article.ai.*`. On circuit-open the result has
+ * `degraded: true` and the FE should show the fallback badge.
+ *
+ * Open to author / editor / admin (the service further enforces author-of-own
+ * when the caller is an author). Editor surfaces always have access.
+ */
+export async function regenerateArticleSummary(id: string): Promise<Article> {
+  const res = await apiClient.post<ApiSuccess<{ article: Article }>>(`/articles/${id}/ai/summary`, {
+    force: true,
+  });
+  return res.data.data.article;
+}

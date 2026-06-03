@@ -92,6 +92,17 @@ function hasBearer(request: Request): boolean {
   return Boolean(request.headers.get('authorization'));
 }
 
+/**
+ * Deterministic AI-summary stub for MSW. Production uses BART; mock just
+ * derives a one-sentence summary from the title so the FE has something
+ * realistic to render. The `attempt` argument lets regenerate produce a
+ * different string each time so the FE can observe the change.
+ */
+function synthSummary(title: string, attempt = 1): string {
+  const base = `${title.trim()} — a quick AI-generated overview of the piece.`;
+  return attempt > 1 ? `${base} (regenerated, take ${attempt})` : base;
+}
+
 /** Test-only: reset mock session state between tests. */
 export function __resetMocks(): void {
   mockSessionActive = false;
@@ -397,9 +408,11 @@ export const handlers = [
     return ok({ article: updated });
   }),
 
-  // POST /:id/approve — submitted → approved. Real backend also kicks off the
-  // AI pipeline + writes back `article.ai.*`; the mock omits that side-effect
-  // for now (FE-4b will mock the AI summary block separately).
+  // POST /:id/approve — submitted → approved. Real backend kicks off the AI
+  // pipeline asynchronously; we synchronously stamp a fake `ai` payload here
+  // so the editor preview demo shows a populated AISummaryBlock immediately
+  // (the production "awaiting pipeline" state is still reachable from any
+  // article whose `ai.summary` is empty — e.g. via a `server.use()` override).
   http.post(`${BASE}/articles/:id/approve`, ({ params }) => {
     const idx = mockDraftsState.findIndex((d) => d.id === params.id);
     if (idx === -1) return err('NOT_FOUND', 'Article not found', 404);
@@ -411,6 +424,14 @@ export const handlers = [
       ...article,
       status: 'approved',
       approvedAt: new Date().toISOString(),
+      ai: {
+        summary: synthSummary(article.title),
+        keywords: article.tags ?? [],
+        readingTimeMin: Math.max(1, Math.ceil((article.plainText?.length ?? 0) / 1100)),
+        ttsAudioUrl: null,
+        degraded: false,
+        model: 'bart-large-cnn-mock',
+      },
       version: article.version + 1,
       updatedAt: new Date().toISOString(),
     };
@@ -527,6 +548,45 @@ export const handlers = [
         trending: body.trending ?? currentPlacement.trending,
         trail: body.trail ?? currentPlacement.trail,
         priority: body.priority ?? currentPlacement.priority,
+      },
+      version: article.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    mockDraftsState = mockDraftsState.map((d, i) => (i === idx ? updated : d));
+    return ok({ article: updated });
+  }),
+
+  // POST /:id/ai/summary — force-regenerate the AI summary. Real backend
+  // re-runs the AI pipeline via the opossum-gated proxy; mock synthesises
+  // a deterministic summary from the title + tags. Tests can override with
+  // `server.use()` to inject a `degraded: true` response, an AI_UNAVAILABLE
+  // 503, or any other edge case.
+  http.post(`${BASE}/articles/:id/ai/summary`, ({ params }) => {
+    const idx = mockDraftsState.findIndex((d) => d.id === params.id);
+    if (idx === -1) return err('NOT_FOUND', 'Article not found', 404);
+    const article = mockDraftsState[idx]!;
+    // Backend allows the regenerate on approved/published/unpublished — drafts
+    // and submitted articles haven't been through the pipeline yet.
+    if (
+      article.status !== 'approved' &&
+      article.status !== 'published' &&
+      article.status !== 'unpublished'
+    ) {
+      return err(
+        'INVALID_STATE',
+        `AI summary requires an approved article (was ${article.status})`,
+        422,
+      );
+    }
+    const updated: (typeof mockDrafts)[number] = {
+      ...article,
+      ai: {
+        summary: synthSummary(article.title, /* attempt: */ (article.ai?.summary?.length ?? 0) + 1),
+        keywords: article.tags ?? [],
+        readingTimeMin: Math.max(1, Math.ceil((article.plainText?.length ?? 0) / 1100)),
+        ttsAudioUrl: article.ai?.ttsAudioUrl ?? null,
+        degraded: false,
+        model: 'bart-large-cnn-mock',
       },
       version: article.version + 1,
       updatedAt: new Date().toISOString(),
