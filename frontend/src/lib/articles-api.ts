@@ -139,6 +139,7 @@ export async function updateArticlePlacement(id: string, body: PlacementInput): 
 }
 
 /**
+ * // FE-4b: AI summary regeneration helper.
  * `POST /v1/articles/:id/ai/summary` — force-regenerate the AI summary.
  *
  * Body carries `{ force: true }` by default (the only mode used in
