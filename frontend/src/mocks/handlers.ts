@@ -6,6 +6,7 @@ import {
   mockComments,
   mockDrafts,
   mockEpaperIssues,
+  mockNotifications,
   mockTags,
   mockUser,
 } from './fixtures';
@@ -96,6 +97,14 @@ let mockCommentsState: Array<(typeof mockComments)[number]> = [...mockComments];
 let nextCommentId = 100;
 
 /**
+ * Mutable notifications list — `mark-read` + `mark-all-read` flip the
+ * `read` flag per session. Reset on `__resetMocks`. No POST creation
+ * endpoint exists on the FE side because the real backend emits
+ * notifications from event listeners.
+ */
+let mockNotificationsState: Array<(typeof mockNotifications)[number]> = [...mockNotifications];
+
+/**
  * Single-row moderation helper used by the three comment-action handlers
  * (approve / reject / hide). Returns the same response envelope the real
  * backend does, including `moderatedBy` / `moderatedAt` provenance fields
@@ -144,6 +153,7 @@ export function __resetMocks(): void {
   nextDraftId = 100;
   mockCommentsState = [...mockComments];
   nextCommentId = 100;
+  mockNotificationsState = [...mockNotifications];
 }
 
 /**
@@ -319,8 +329,12 @@ export const handlers = [
   http.get(`${BASE}/articles/feed/home`, () =>
     ok({ hero: mockArticleSummaries[0], rail: mockArticleSummaries.slice(1) }),
   ),
+  // GET /articles/by-slug/:slug — public reader read; only published articles
+  // surface. Subphase 5's reader-shape `mockArticleSummaries` is no longer the
+  // source — we now read from `mockDraftsState` to get the full Article shape
+  // (body, AI summary, etc.) the public article page actually needs.
   http.get(`${BASE}/articles/by-slug/:slug`, ({ params }) => {
-    const article = mockArticleSummaries.find((a) => a.slug === params.slug);
+    const article = mockDraftsState.find((a) => a.slug === params.slug && a.status === 'published');
     if (!article) return err('NOT_FOUND', 'Article not found', 404);
     return ok({ article });
   }),
@@ -721,7 +735,54 @@ export const handlers = [
   http.get(`${BASE}/bookmarks`, () => err('UNAUTHORIZED', 'Sign in to view bookmarks', 401)),
 
   // ── Notifications ──────────────────────────────────────────────────────
-  http.get(`${BASE}/notifications`, () => ok([])),
+  // ── Notifications ──────────────────────────────────────────────────────
+  //
+  // Real backend scopes by `req.user.id`; mock always operates on the seeded
+  // mockUser. `unreadOnly` mirrors backend semantics. Bell badge polls with
+  // `limit=1` and reads the global `unread` counter (never affected by the
+  // filter).
+  http.get(`${BASE}/notifications`, ({ request }) => {
+    if (!hasBearer(request)) return err('UNAUTHORIZED', 'Not signed in', 401);
+    const url = new URL(request.url);
+    const unreadOnly = url.searchParams.get('unreadOnly') === 'true';
+    const mine = mockNotificationsState.filter((n) => n.userId === mockUserState.id);
+    const items = unreadOnly ? mine.filter((n) => !n.read) : mine;
+    const unread = mine.filter((n) => !n.read).length;
+    return ok({ items, total: items.length, unread, page: 1, limit: 50 });
+  }),
+
+  // POST /notifications/:id/read — idempotent (200 even if already read).
+  http.post(`${BASE}/notifications/:id/read`, ({ request, params }) => {
+    if (!hasBearer(request)) return err('UNAUTHORIZED', 'Not signed in', 401);
+    const idx = mockNotificationsState.findIndex(
+      (n) => n.id === params.id && n.userId === mockUserState.id,
+    );
+    if (idx === -1) return err('NOT_FOUND', 'Notification not found', 404);
+    const current = mockNotificationsState[idx]!;
+    const now = new Date().toISOString();
+    const updated = {
+      ...current,
+      read: true,
+      readAt: current.readAt ?? now,
+      updatedAt: now,
+    };
+    mockNotificationsState = mockNotificationsState.map((n, i) => (i === idx ? updated : n));
+    return ok({ notification: updated });
+  }),
+
+  // POST /notifications/read-all — flips every unread owned by the current
+  // user. Returns the count flipped so the FE can confirm the action.
+  http.post(`${BASE}/notifications/read-all`, ({ request }) => {
+    if (!hasBearer(request)) return err('UNAUTHORIZED', 'Not signed in', 401);
+    const now = new Date().toISOString();
+    let updated = 0;
+    mockNotificationsState = mockNotificationsState.map((n) => {
+      if (n.userId !== mockUserState.id || n.read) return n;
+      updated += 1;
+      return { ...n, read: true, readAt: now, updatedAt: now };
+    });
+    return ok({ updated });
+  }),
 
   // ── Ads ─────────────────────────────────────────────────────────────────
   http.get(`${BASE}/ads`, () => ok([])),

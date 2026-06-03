@@ -62,6 +62,17 @@ export async function getArticle(id: string): Promise<Article> {
 }
 
 /**
+ * `GET /v1/articles/by-slug/:slug` — public; returns only published articles.
+ * Backend authoritatively scopes to `status: 'published'` and includes the
+ * full Article shape with AI summary so the reader page can render with one
+ * request. Returns 404 for unpublished slugs (no existence leak).
+ */
+export async function getArticleBySlug(slug: string): Promise<Article> {
+  const res = await apiClient.get<ApiSuccess<{ article: Article }>>(`/articles/by-slug/${slug}`);
+  return res.data.data.article;
+}
+
+/**
  * `POST /v1/articles/:id/submit` — flip draft → submitted. Backend re-runs
  * the full submission checklist; failures arrive as `422 VALIDATION_ERROR`
  * with `details: { field, ... }` so the FE can render inline errors.
@@ -139,7 +150,6 @@ export async function updateArticlePlacement(id: string, body: PlacementInput): 
 }
 
 /**
- * // FE-4b: AI summary regeneration helper.
  * `POST /v1/articles/:id/ai/summary` — force-regenerate the AI summary.
  *
  * Body carries `{ force: true }` by default (the only mode used in

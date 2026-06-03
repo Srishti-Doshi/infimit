@@ -7,6 +7,7 @@
  */
 import type { Article } from '@/types/article';
 import type { Comment } from '@/types/comment';
+import type { Notification } from '@/types/notification';
 
 export const mockUser = {
   id: 'usr_demo_001',
@@ -197,6 +198,7 @@ export const mockDrafts: Article[] = [
   // walk a draft through submit → approve → publish.
   {
     id: 'art_published_001',
+    slug: 'how-indian-campuses-adopted-ai-tutoring',
     title: 'How Indian campuses adopted AI tutoring',
     subtitle: 'A year-long study across twelve institutions',
     body: '<p>The piece walks through enrollment data, dropout signals, and faculty perceptions.</p>',
@@ -210,6 +212,7 @@ export const mockDrafts: Article[] = [
     tags: ['ai', 'tutoring', 'india', 'research'],
     location: 'Pan-India',
     authorId: 'usr_demo_001',
+    author: { id: 'usr_demo_001', name: 'Demo Reader' },
     organisationId: null,
     editorId: null,
     status: 'published',
@@ -327,6 +330,56 @@ export const mockComments: Comment[] = [
     status: 'pending',
     createdAt: '2026-06-03T10:00:00.000Z',
     updatedAt: '2026-06-03T10:00:00.000Z',
+  },
+];
+
+/**
+ * Subphase 4 notifications — server-emitted by event listeners on the real
+ * backend, so the FE never POSTs to create. Mix of unread + read for the
+ * mockUser so the bell badge and list page have meaningful content in dev.
+ */
+export const mockNotifications: Notification[] = [
+  {
+    id: 'ntf_001',
+    userId: 'usr_demo_001',
+    type: 'article_approved',
+    title: 'Your draft was approved',
+    body: '“Edtech in 2026: a research roundup” is now ready to publish.',
+    link: '/dashboard/author/submissions',
+    metadata: { articleId: 'art_ready_001' },
+    read: false,
+    readAt: null,
+    channel: 'in_app',
+    createdAt: '2026-06-03T08:30:00.000Z',
+    updatedAt: '2026-06-03T08:30:00.000Z',
+  },
+  {
+    id: 'ntf_002',
+    userId: 'usr_demo_001',
+    type: 'new_comment',
+    title: 'New comment on your article',
+    body: 'Rahul Verma commented on “How Indian campuses adopted AI tutoring”.',
+    link: '/article/how-indian-campuses-adopted-ai-tutoring',
+    metadata: { articleId: 'art_published_001', commentId: 'cmt_001' },
+    read: false,
+    readAt: null,
+    channel: 'in_app',
+    createdAt: '2026-06-02T15:12:00.000Z',
+    updatedAt: '2026-06-02T15:12:00.000Z',
+  },
+  {
+    id: 'ntf_003',
+    userId: 'usr_demo_001',
+    type: 'article_published',
+    title: 'Your article is live',
+    body: '“How Indian campuses adopted AI tutoring” has been published.',
+    link: '/article/how-indian-campuses-adopted-ai-tutoring',
+    metadata: { articleId: 'art_published_001' },
+    read: true,
+    readAt: '2026-05-23T09:00:00.000Z',
+    channel: 'in_app',
+    createdAt: '2026-05-22T14:05:00.000Z',
+    updatedAt: '2026-05-23T09:00:00.000Z',
   },
 ];
 

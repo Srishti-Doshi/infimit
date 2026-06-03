@@ -70,4 +70,30 @@ describe('apiClient — single-flight 401 refresh', () => {
     await expect(apiClient.get('/users/me')).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     expect(useAuthStore.getState().accessToken).toBeNull();
   });
+
+  // 403 = "valid token, no permission" — must NOT trigger refresh or clear
+  // the session. Pins down the FE-4d follow-up deferred from PR #5: previous
+  // versions of the interceptor used to bounce 403s to /auth/login like a
+  // session loss, which broke role-denial UX.
+  it('does NOT clear the session on a 403 FORBIDDEN response', async () => {
+    useAuthStore.getState().setAccessToken('valid-token');
+    let refreshCalls = 0;
+
+    server.use(
+      http.post(`${BASE}/auth/refresh`, () => {
+        refreshCalls += 1;
+        return HttpResponse.json({ success: true, data: { accessToken: 'fresh' } });
+      }),
+      http.get(`${BASE}/users/editors`, () =>
+        HttpResponse.json(
+          { success: false, error: { code: 'FORBIDDEN', message: 'not allowed' } },
+          { status: 403 },
+        ),
+      ),
+    );
+
+    await expect(apiClient.get('/users/editors')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(refreshCalls).toBe(0);
+    expect(useAuthStore.getState().accessToken).toBe('valid-token');
+  });
 });

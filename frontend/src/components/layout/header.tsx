@@ -1,4 +1,4 @@
-import { Bell, Menu, Search } from 'lucide-react';
+import { Menu, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Button, Container } from '@/components/ui';
@@ -6,6 +6,7 @@ import { useUIStore } from '@/store';
 
 import { BreakingNewsTicker } from './breaking-news-ticker';
 import { Logo } from './logo';
+import { NotificationBell } from './notification-bell';
 import { PrimaryNav } from './primary-nav';
 import { UtilityBar } from './utility-bar';
 
@@ -54,17 +55,7 @@ export function Header(): JSX.Element {
             >
               <Search className="h-5 w-5" aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              className="relative inline-flex h-10 w-10 items-center justify-center rounded-md text-ink-primary transition-colors hover:bg-surface-subtle"
-              aria-label="Notifications"
-            >
-              <Bell className="h-5 w-5" aria-hidden="true" />
-              <span
-                aria-hidden="true"
-                className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-brand-red-500"
-              />
-            </button>
+            <NotificationBell />
             <div className="ml-1 hidden items-center gap-2 md:flex">
               <Link
                 to="/auth/login"

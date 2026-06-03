@@ -118,10 +118,20 @@ function toApiError(error: AxiosError<ApiError>): ApiError['error'] {
 /**
  * Response interceptor.
  *
- * On 401 (once, for a refreshable request): refresh the access token, then
- * replay the original request — the request interceptor re-attaches the fresh
- * token automatically. If refresh fails, clear the session (route guards then
- * redirect to login) and surface the original error.
+ * 401 vs 403 — these are DIFFERENT signals and must NEVER be conflated:
+ *
+ *   - **401 UNAUTHORIZED** = "your token is invalid or expired". Refresh the
+ *     access token (once, for refreshable requests) and replay. If refresh
+ *     itself fails, clear the session (route guards then redirect to login)
+ *     and surface the original error.
+ *
+ *   - **403 FORBIDDEN** = "your token is valid; you just lack permission for
+ *     this resource". Surface the error to the caller. **Do NOT clear the
+ *     session** — the user is still signed in, they just hit a guarded
+ *     endpoint. Earlier versions of this file widened the 401 path to
+ *     include 403 and bounced users to /auth/login on legitimate role
+ *     denials; that bug was fixed and this comment exists to prevent
+ *     regression.
  *
  * All rejections are normalized to the `ApiError['error']` shape so consumers
  * branch on a machine-readable `code` and never parse `message`.
