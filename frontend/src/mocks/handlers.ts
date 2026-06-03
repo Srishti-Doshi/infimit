@@ -1,5 +1,7 @@
 import { http, HttpResponse } from 'msw';
 
+import type { Epaper } from '@/types/epaper';
+
 import {
   mockArticleSummaries,
   mockCategories,
@@ -105,6 +107,15 @@ let nextCommentId = 100;
 let mockNotificationsState: Array<(typeof mockNotifications)[number]> = [...mockNotifications];
 
 /**
+ * Mutable e-paper archive — admin create / delete mutate this in place per
+ * session. Reset on `__resetMocks`. Typed as `Epaper[]` (not inferred from
+ * the fixture) so newly-created issues from the upload form satisfy the
+ * full wire shape including optional fields like `coverImageUrl`.
+ */
+let mockEpaperIssuesState: Epaper[] = [...mockEpaperIssues];
+let nextEpaperId = 100;
+
+/**
  * Single-row moderation helper used by the three comment-action handlers
  * (approve / reject / hide). Returns the same response envelope the real
  * backend does, including `moderatedBy` / `moderatedAt` provenance fields
@@ -154,6 +165,8 @@ export function __resetMocks(): void {
   mockCommentsState = [...mockComments];
   nextCommentId = 100;
   mockNotificationsState = [...mockNotifications];
+  mockEpaperIssuesState = [...mockEpaperIssues];
+  nextEpaperId = 100;
 }
 
 /**
@@ -729,7 +742,94 @@ export const handlers = [
   }),
 
   // ── E-paper ────────────────────────────────────────────────────────────
-  http.get(`${BASE}/epaper`, () => ok(mockEpaperIssues)),
+  // ── E-papers ───────────────────────────────────────────────────────────
+  //
+  // Public list / single / download; admin create + delete. Mutable state
+  // so the Subphase 4 admin upload form (FE-4e) reflects new issues in the
+  // archive list within the same dev session.
+
+  http.get(`${BASE}/epapers`, ({ request }) => {
+    const url = new URL(request.url);
+    const fromParam = url.searchParams.get('from');
+    const toParam = url.searchParams.get('to');
+    const from = fromParam ? new Date(fromParam) : null;
+    const to = toParam ? new Date(toParam) : null;
+    const filtered = mockEpaperIssuesState.filter((e) => {
+      const d = new Date(e.issueDate);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
+    // Newest issueDate first — matches the backend's primary access pattern.
+    const items = [...filtered].sort(
+      (a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime(),
+    );
+    return ok({ items, total: items.length, page: 1, limit: 20 });
+  }),
+
+  http.get(`${BASE}/epapers/:id`, ({ params }) => {
+    const epaper = mockEpaperIssuesState.find((e) => e.id === params.id);
+    if (!epaper) return err('NOT_FOUND', 'Issue not found', 404);
+    return ok({ epaper });
+  }),
+
+  // GET /epapers/:id/download — backend 302s to the presigned S3 URL. The
+  // FE never goes through axios for this (see `epaperDownloadUrl`); the
+  // browser navigates directly. We still wire a stub here so MSW doesn't
+  // complain about unhandled requests if a test happens to hit it.
+  http.get(`${BASE}/epapers/:id/download`, ({ params }) => {
+    const epaper = mockEpaperIssuesState.find((e) => e.id === params.id);
+    if (!epaper) return err('NOT_FOUND', 'Issue not found', 404);
+    return HttpResponse.json(
+      { success: true, data: { url: `https://mock-cdn.test/epapers/${epaper.id}.pdf` } },
+      { status: 200 },
+    );
+  }),
+
+  // POST /epapers — admin create. Real backend re-validates each media id's
+  // `purpose` (epaper_pdf / epaper_cover); we trust the FE-supplied ids in
+  // the mock since dev users don't typically swap media types mid-flow.
+  http.post(`${BASE}/epapers`, async ({ request }) => {
+    if (!hasBearer(request)) return err('UNAUTHORIZED', 'Sign in to publish', 401);
+    const body = (await request.json()) as {
+      title?: string;
+      issueDate?: string;
+      pdfMediaId?: string;
+      coverMediaId?: string;
+      pageCount?: number;
+    };
+    if (!body.title?.trim() || body.title.length > 255) {
+      return err('VALIDATION_ERROR', 'Title is required (1-255 chars)', 422, { field: 'title' });
+    }
+    if (!body.issueDate || Number.isNaN(Date.parse(body.issueDate))) {
+      return err('VALIDATION_ERROR', 'Invalid issue date', 422, { field: 'issueDate' });
+    }
+    nextEpaperId += 1;
+    const now = new Date().toISOString();
+    const newEpaper: Epaper = {
+      id: `epp_${nextEpaperId.toString().padStart(3, '0')}`,
+      title: body.title.trim(),
+      issueDate: new Date(body.issueDate).toISOString(),
+      pdfMediaId: body.pdfMediaId ?? '',
+      coverMediaId: body.coverMediaId ?? '',
+      coverImageUrl: null,
+      pageCount: body.pageCount ?? 0,
+      uploadedBy: mockUserState.id,
+      stats: { downloads: 0, views: 0 },
+      createdAt: now,
+      updatedAt: now,
+    };
+    mockEpaperIssuesState = [newEpaper, ...mockEpaperIssuesState];
+    return HttpResponse.json({ success: true, data: { epaper: newEpaper } }, { status: 201 });
+  }),
+
+  http.delete(`${BASE}/epapers/:id`, ({ request, params }) => {
+    if (!hasBearer(request)) return err('UNAUTHORIZED', 'Sign in to delete', 401);
+    const idx = mockEpaperIssuesState.findIndex((e) => e.id === params.id);
+    if (idx === -1) return err('NOT_FOUND', 'Issue not found', 404);
+    mockEpaperIssuesState = mockEpaperIssuesState.filter((_, i) => i !== idx);
+    return new HttpResponse(null, { status: 204 });
+  }),
 
   // ── Bookmarks ──────────────────────────────────────────────────────────
   http.get(`${BASE}/bookmarks`, () => err('UNAUTHORIZED', 'Sign in to view bookmarks', 401)),

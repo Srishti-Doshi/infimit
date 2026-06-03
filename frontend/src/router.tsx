@@ -37,6 +37,8 @@ const AdminLandingPage = lazy(() => import('@/pages/dashboard/admin'));
 const AdminEditorsPage = lazy(() => import('@/pages/dashboard/admin/editors'));
 const AdminOrganisationsPage = lazy(() => import('@/pages/dashboard/admin/organisations'));
 const AdminApprovalsPage = lazy(() => import('@/pages/dashboard/admin/approvals'));
+const AdminEpapersPage = lazy(() => import('@/pages/dashboard/admin/epapers'));
+const NewEpaperPage = lazy(() => import('@/pages/dashboard/admin/epapers/new'));
 
 function RouteFallback(): JSX.Element {
   return (
@@ -124,6 +126,8 @@ const router = createBrowserRouter(
                 { path: 'dashboard/admin/editors', element: <AdminEditorsPage /> },
                 { path: 'dashboard/admin/organisations', element: <AdminOrganisationsPage /> },
                 { path: 'dashboard/admin/approvals', element: <AdminApprovalsPage /> },
+                { path: 'dashboard/admin/epapers', element: <AdminEpapersPage /> },
+                { path: 'dashboard/admin/epapers/new', element: <NewEpaperPage /> },
               ],
             },
           ],
