@@ -5,25 +5,17 @@
 #   - `backend`  → typecheck / lint / format / test / build
 #   - `frontend` → typecheck / lint / format / test / build
 #
-# Each job uses its own lockfile-keyed npm cache and only runs when its
-# files change (or when the workflow file itself changes). Concurrency
-# cancellation prevents wasted minutes on rapid-fire pushes.
+# Both jobs run on every PR and every push to main. Each uses its own
+# lockfile-keyed npm cache. Concurrency cancellation prevents wasted
+# minutes on rapid-fire pushes.
 # ---------------------------------------------------------------
 
 name: CI
 
 on:
   pull_request:
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/ci.yml'
   push:
     branches: [main]
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/ci.yml'
 
 # Cancel any superseded run for the same PR or branch.
 concurrency:
