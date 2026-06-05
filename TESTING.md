@@ -47,7 +47,9 @@ Order recommended for Phase C:
 
 ### Stack-under-test
 - **Real backend** (not MSW). Mongo + Redis + MinIO via docker-compose. AI service (FastAPI) running.
-- **Real frontend** dev server (`vite`) talking to real backend (`apiClient` base URL pointing at `http://localhost:4000` or whatever the env sets).
+- **Real frontend** dev server (`vite`) talking to real backend (`apiClient` base URL pointing at `http://localhost:4000/v1`).
+- **MSW must be OFF.** Set `VITE_USE_MOCK=false` in `frontend/.env` before starting the FE dev server. Without this, MSW intercepts every request and you'll be silently testing against mocks, not the real backend. Verify in DevTools Console — `[MSW] Mocking enabled.` should **NOT** appear at boot. If it does, clear site data, set the env var, restart `vite`.
+- **Email is stubbed.** The backend does not send real emails in dev (no mailcatcher in `docker-compose.dev.yml`). Verification + password-reset URLs are logged to the backend terminal as `email_verify_sent_stub` / `email_password_reset_sent_stub`. Grep the BE log when you need the link.
 
 ### Commands
 | Workspace | Dev server | Pre-flight |
@@ -140,12 +142,12 @@ Add label `qa/subphase-4`. Add a severity label if helpful (e.g. `severity:criti
 **Surface:** `/auth/login`, `/auth/register`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/verify-email`. Backend `auth` module + JWT refresh + email verification flow. Interceptor in `lib/api-client.ts`.
 
 #### Happy-path checklist
-- [ ] Register a new account with valid name/email/password — success message, verification email queued (check inbox or `mailcatcher` if used).
-- [ ] Click verification link from email → lands on `/auth/verify-email?token=...` → success toast → redirected to login.
-- [ ] Log in with verified credentials → lands on `/dashboard/me` (or role-appropriate landing).
-- [ ] Refresh the page → still logged in (session persisted).
-- [ ] Click logout → session cleared → redirected to login.
-- [ ] Forgot-password flow: request reset → receive email → set new password → log in with new password.
+- [ ] Register a new account with valid name/email/password — success state shown, verify URL logged to BE terminal as `email_verify_sent_stub`. **User is auto-logged in immediately** (access + refresh tokens issued at register, BEFORE verification — the verify flow only flips `isEmailVerified`, not session state).
+- [ ] Paste the verify URL into the browser → `/auth/verify-email?token=...` → "Email verified" success modal → BE logs `auth_email_verified` audit. User remains signed in (does NOT redirect to login).
+- [ ] After a logout, log in again with the verified credentials → lands on `/dashboard/me` (or role-appropriate landing).
+- [ ] Refresh the page **once** → still logged in (session persisted). Note: rapid repeated refresh exposes the rate-limit / 429-as-logout cluster (see issue #20).
+- [ ] Click "Sign out" → BE logs `auth_logout`, session cleared, redirected to `/auth/login?next=...`.
+- [ ] Forgot-password flow: request reset (BE logs `email_password_reset_sent_stub`) → paste reset URL → set new password (BE logs `auth_password_reset_completed` with `revokedSessions ≥ 1`) → log in with new password.
 
 #### Edge cases
 - [ ] Register with already-used email → friendly error (envelope `error.code` like `EMAIL_TAKEN`), not raw 500.
