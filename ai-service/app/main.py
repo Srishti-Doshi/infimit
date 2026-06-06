@@ -1,20 +1,30 @@
 import logging
 from fastapi import FastAPI
+from fastapi import Depends
+from app.dependencies import verify_internal_key
 from app.routers.summarize import router as summarize_router
 from app.middleware.auth_middleware import AuthMiddleware
+from fastapi import FastAPI
+from app.config import settings
+from app.routers.health import router as health_router
+
 app = FastAPI()
 
 app.include_router(summarize_router)
-app.add_middleware(AuthMiddleware)
+# app.add_middleware(AuthMiddleware)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
+#Connects health.py to the FastAPI app.
+app.include_router(
+    health_router,
+    prefix="/v1",
+    tags=["Health"]
+)
 
  
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+print(settings.PORT)
 
  

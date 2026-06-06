@@ -1,0 +1,33 @@
+from fastapi import Header, HTTPException
+from app.config import settings
+
+def verify_internal_key(
+    x_internal_key: str = Header(...)
+):
+    print("verify_internal_key called")
+    if x_internal_key != settings.AI_INTERNAL_KEY:
+        raise HTTPException(
+            status_code=403,
+            detail="Unauthorized"
+        )
+
+    return True
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# An internal key prevents unauthorized users or applications from accessing an API.

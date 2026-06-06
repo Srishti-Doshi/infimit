@@ -87,6 +87,7 @@ Task:
 Create a detailed professional summary.
 
 Polish article
+    maximum 2000 words in article
     Remove repetition
     Remove unnecessary details
     Improve readability
