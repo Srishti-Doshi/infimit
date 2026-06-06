@@ -189,6 +189,31 @@ describe('POST /v1/articles/:id/approve', () => {
     expect(res.status).toBe(403);
   });
 
+  it('forbids editor from approving their own submission (#32 fix-PR — COI guard)', async () => {
+    // Now that editor can submit (issue #32), the COI safeguard lives here:
+    // an editor (or admin) cannot approve an article they authored. Approval
+    // by ANOTHER editor/admin still works (covered by the happy-path test).
+    const editor = await seedUser('editor');
+    const { id } = await seedSubmittedArticle(editor.id);
+
+    const res = await request(app)
+      .post(`/v1/articles/${id}/approve`)
+      .set('Authorization', `Bearer ${editor.token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN');
+  });
+
+  it('forbids admin from approving their own submission (COI guard applies to admins too)', async () => {
+    const admin = await seedUser('admin');
+    const { id } = await seedSubmittedArticle(admin.id);
+
+    const res = await request(app)
+      .post(`/v1/articles/${id}/approve`)
+      .set('Authorization', `Bearer ${admin.token}`);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN');
+  });
+
   it('refuses to approve a non-submitted article (INVALID_STATE)', async () => {
     const author = await seedUser('author');
     const editor = await seedUser('editor');

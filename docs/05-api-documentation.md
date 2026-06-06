@@ -155,8 +155,8 @@ Sets `refresh_token` httpOnly cookie. **Errors:** `401 INVALID_CREDENTIALS`, `40
 | POST   | `/articles` | ✍️📝 | Create draft |
 | PATCH  | `/articles/:id` | ✍️📝 | Update draft/article |
 | DELETE | `/articles/:id` | ✍️📝👑 | Delete (owner or higher) |
-| POST   | `/articles/:id/submit` | ✍️ | Submit for review |
-| POST   | `/articles/:id/approve` | 📝👑 | Approve |
+| POST   | `/articles/:id/submit` | ✍️📝👑 | Submit for review (service confirms ownership) |
+| POST   | `/articles/:id/approve` | 📝👑 | Approve (cannot approve own submission — COI guard) |
 | POST   | `/articles/:id/reject` | 📝👑 | Reject with reason |
 | POST   | `/articles/:id/publish` | 📝👑 | Publish approved article |
 | POST   | `/articles/:id/unpublish` | 👑 | Unpublish |

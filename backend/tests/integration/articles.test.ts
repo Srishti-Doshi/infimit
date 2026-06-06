@@ -443,7 +443,28 @@ describe('POST /v1/articles/:id/submit', () => {
     expect(res.status).toBe(403);
   });
 
-  it('forbids editors from submitting (conflict of interest — editors curate, not author)', async () => {
+  it('editor can submit their own draft (#32 fix-PR — COI now enforced at approve step)', async () => {
+    // Editors used to be excluded from submit to prevent self-approve COI.
+    // Per issue #32, editor is now allowed to submit (so they can author),
+    // and the COI guard moved to `approveArticle` (covered in articles-
+    // lifecycle.test.ts). Ownership check still prevents editor from
+    // submitting someone else's draft (covered in the next test).
+    const editor = await seedUser('editor');
+    const cover = await seedCoverMedia(editor.id);
+    const created = await request(app)
+      .post('/v1/articles')
+      .set('Authorization', `Bearer ${editor.token}`)
+      .send(VALID_CREATE_BODY(cover));
+
+    const res = await request(app)
+      .post(`/v1/articles/${created.body.data.article.id}/submit`)
+      .set('Authorization', `Bearer ${editor.token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.article.status).toBe('submitted');
+    expect(res.body.data.article.submittedAt).toBeTruthy();
+  });
+
+  it("forbids editor from submitting someone else's draft (ownership check holds)", async () => {
     const author = await seedUser('author');
     const editor = await seedUser('editor');
     const cover = await seedCoverMedia(author.id);

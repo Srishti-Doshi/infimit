@@ -656,6 +656,13 @@ export async function approveArticle(input: ApproveArticleInput): Promise<Articl
   if (article.status !== 'submitted') {
     throw ApiError.invalidState('Only submitted articles can be approved');
   }
+  // COI guard: editor/admin who authored the submission cannot approve it.
+  // Added in the #32 fix-PR alongside widening submit to accept editor —
+  // the original code prevented the scenario by keeping editor off submit;
+  // we now allow editor to submit and block self-approve here instead.
+  if (article.authorId.toString() === input.actorId) {
+    throw ApiError.forbidden('You cannot approve your own submission');
+  }
 
   const transitioned = await articlesRepo.transition({
     id: article._id,

@@ -58,14 +58,16 @@ router.get('/slug/:slug', validate({ params: articleSlugParamSchema }), getArtic
 //   - submit accepts admin so platform owners can dogfood the full author flow
 //     (Day-13 follow-up from PR #7 — service-layer ownership check still
 //     prevents admin from submitting someone ELSE's draft).
-//   - editor stays excluded from submit since editor work is curation; an
-//     editor approving their own submission is a conflict of interest.
+//   - submit accepts editor (Subphase 4 QA follow-up — see issue #32). The
+//     COI concern that originally kept editor out is now handled at the
+//     approve step: `approveArticle` rejects when actor === article.authorId.
 //
 //   POST /articles            ✍️📝👑   (no readers)
 //   GET  /articles, /:id      👤        (any authenticated; service narrows)
 //   PATCH /:id                ✍️📝👑   (service further enforces ownership)
-//   POST /:id/submit          ✍️👑     (author or admin; service confirms
-//                                          the actor owns the article)
+//   POST /:id/submit          ✍️📝👑   (author, editor, or admin; service
+//                                          confirms actor owns the article;
+//                                          approve step blocks self-approve)
 //   DELETE /:id               ✍️📝👑   (service further enforces ownership)
 router.post(
   '/',
@@ -86,7 +88,7 @@ router.patch(
 router.post(
   '/:id/submit',
   requireAuth,
-  requireRole('author', 'admin'),
+  requireRole('author', 'editor', 'admin'),
   validate({ params: articleIdParamSchema }),
   submitArticleHandler,
 );
@@ -100,7 +102,9 @@ router.delete(
 
 // ─── Subphase 4 — editorial lifecycle ───────────────────────────────────
 // Role gates per docs/05-api-documentation.md §5.5:
-//   POST /:id/approve         📝👑       (editor or admin)
+//   POST /:id/approve         📝👑       (editor or admin; cannot approve a
+//                                          submission you authored — COI guard
+//                                          in approveArticle service)
 //   POST /:id/reject          📝👑       (editor or admin)
 //   POST /:id/publish         📝👑       (editor or admin)
 //   POST /:id/unpublish       👑          (admin ONLY — bigger blast radius)
