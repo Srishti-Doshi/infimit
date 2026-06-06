@@ -51,7 +51,7 @@ describe('<ArticlePage>', () => {
 
   it('renders the not-found state when the slug returns 404', async () => {
     server.use(
-      http.get(`${BASE}/articles/by-slug/:slug`, () =>
+      http.get(`${BASE}/articles/slug/:slug`, () =>
         HttpResponse.json(
           { success: false, error: { code: 'NOT_FOUND', message: 'Article not found' } },
           { status: 404 },

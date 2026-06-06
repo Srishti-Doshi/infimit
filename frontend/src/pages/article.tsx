@@ -14,7 +14,7 @@ import { ARTICLE_CATEGORY_LABELS } from '@/lib/articles-schema';
  * Functional baseline per the FE handler doc — Subphase 5 polishes the
  * layout (typography, related articles, social meta, Lighthouse pass).
  * For Subphase 4 we ship:
- *   - GET /v1/articles/by-slug/:slug (404 if not published)
+ *   - GET /v1/articles/slug/:slug (404 if not published)
  *   - Sanitised body render via <SanitizedHtml> (defense-in-depth)
  *   - AI summary block (lightweight reader variant, no regenerate button —
  *     that's an editor action; readers only see the result)
@@ -28,7 +28,7 @@ export default function ArticlePage(): JSX.Element {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ['articles', 'by-slug', slug],
+    queryKey: ['articles', 'slug', slug],
     queryFn: () => getArticleBySlug(slug),
     enabled: slug.length > 0,
     // The article only changes when the editor edits + republishes. 60s stale
