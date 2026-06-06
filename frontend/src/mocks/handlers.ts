@@ -342,11 +342,11 @@ export const handlers = [
   http.get(`${BASE}/articles/feed/home`, () =>
     ok({ hero: mockArticleSummaries[0], rail: mockArticleSummaries.slice(1) }),
   ),
-  // GET /articles/by-slug/:slug — public reader read; only published articles
+  // GET /articles/slug/:slug — public reader read; only published articles
   // surface. Subphase 5's reader-shape `mockArticleSummaries` is no longer the
   // source — we now read from `mockDraftsState` to get the full Article shape
   // (body, AI summary, etc.) the public article page actually needs.
-  http.get(`${BASE}/articles/by-slug/:slug`, ({ params }) => {
+  http.get(`${BASE}/articles/slug/:slug`, ({ params }) => {
     const article = mockDraftsState.find((a) => a.slug === params.slug && a.status === 'published');
     if (!article) return err('NOT_FOUND', 'Article not found', 404);
     return ok({ article });

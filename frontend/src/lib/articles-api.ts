@@ -62,13 +62,13 @@ export async function getArticle(id: string): Promise<Article> {
 }
 
 /**
- * `GET /v1/articles/by-slug/:slug` — public; returns only published articles.
+ * `GET /v1/articles/slug/:slug` — public; returns only published articles.
  * Backend authoritatively scopes to `status: 'published'` and includes the
  * full Article shape with AI summary so the reader page can render with one
  * request. Returns 404 for unpublished slugs (no existence leak).
  */
 export async function getArticleBySlug(slug: string): Promise<Article> {
-  const res = await apiClient.get<ApiSuccess<{ article: Article }>>(`/articles/by-slug/${slug}`);
+  const res = await apiClient.get<ApiSuccess<{ article: Article }>>(`/articles/slug/${slug}`);
   return res.data.data.article;
 }
 
