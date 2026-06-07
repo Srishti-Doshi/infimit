@@ -119,7 +119,12 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
     throw ApiError.unauthorized();
   }
   const cookie = req.cookies?.[REFRESH_COOKIE_NAME];
-  await logoutUser(typeof cookie === 'string' ? cookie : undefined, req.user.id);
+  await logoutUser(
+    typeof cookie === 'string' ? cookie : undefined,
+    req.user.jti,
+    req.user.exp,
+    req.user.id,
+  );
   clearRefreshCookie(res);
   res.status(204).send();
 });

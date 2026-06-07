@@ -22,6 +22,7 @@ import { hashPassword, signPurposeToken } from '@/shared/crypto';
 
 import { revokeAllSessionsForUser, sendEditorWelcomeEmail } from '@/modules/auth';
 
+import type { UserRole } from '@/shared/types';
 import * as usersRepo from './repository';
 import type { UserModel } from './model';
 
@@ -212,4 +213,108 @@ export async function removeEditor(adminId: string, targetId: string): Promise<v
     },
     'user_editor_removed',
   );
+}
+
+// ─── admin: change role ──────────────────────────────────────────────────
+
+/**
+ * Convert a name to a URL-safe author slug. Duplicated from auth/service.ts —
+ * inlining keeps the cross-module import surface flat. Worth promoting to a
+ * shared helper when a third caller appears.
+ */
+function generateSlug(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || 'user';
+}
+
+async function uniqueAuthorSlug(name: string): Promise<string> {
+  const base = generateSlug(name);
+  let candidate = base;
+  let counter = 1;
+  // eslint-disable-next-line no-await-in-loop
+  while (await usersRepo.findBySlug(candidate)) {
+    counter += 1;
+    candidate = `${base}-${counter}`;
+  }
+  return candidate;
+}
+
+/**
+ * Admin promotes/demotes a user's role.
+ *
+ * Guards (in order, fail-fast):
+ *   - Target id is well-formed.
+ *   - Actor cannot change their OWN role (admins demoting themselves locks them
+ *     out; promoting yourself bypasses peer review).
+ *   - Target exists and isn't soft-deleted.
+ *   - Last-admin guard: if the target is currently the only active admin and
+ *     newRole isn't admin, reject — at least one admin must remain so admin
+ *     access doesn't disappear from the platform.
+ *   - Idempotent no-op when target.role === newRole.
+ *
+ * Side effects:
+ *   - When promoting to `author`, generate a unique slug if the user doesn't
+ *     already have one (authors need a public `/authors/:slug` URL).
+ *   - Demoting from `author` leaves the existing slug in place — `getAuthorBySlug`
+ *     already 404s for non-author roles, so the URL stops resolving safely.
+ *   - Role propagates to the access token on the user's next refresh-rotation
+ *     (refreshTokens reads `user.role` from DB). Until then, up to ~15 min of
+ *     the old role may persist on the active access token — acceptable per
+ *     docs/10-security.md §10.2.
+ */
+export async function updateUserRole(
+  actorId: string,
+  targetId: string,
+  newRole: UserRole,
+): Promise<UserModel> {
+  if (!Types.ObjectId.isValid(targetId)) {
+    throw ApiError.validation('Invalid user id');
+  }
+  if (actorId === targetId) {
+    throw ApiError.forbidden('Cannot change your own role');
+  }
+
+  const target = await usersRepo.findById(targetId);
+  if (!target || target.deletedAt !== null) {
+    throw ApiError.notFound('User not found');
+  }
+
+  if (target.role === newRole) {
+    return target;
+  }
+
+  if (target.role === 'admin' && newRole !== 'admin') {
+    const adminCount = await usersRepo.countActiveBy({ role: 'admin' });
+    if (adminCount <= 1) {
+      throw ApiError.forbidden('Cannot demote the last admin');
+    }
+  }
+
+  const patch: { role: UserRole; slug?: string } = { role: newRole };
+  if (newRole === 'author' && !target.slug) {
+    patch.slug = await uniqueAuthorSlug(target.name);
+  }
+
+  const updated = await usersRepo.updateById(targetId, patch);
+  if (!updated) {
+    throw ApiError.notFound('User not found');
+  }
+
+  auditLog(
+    {
+      entity: 'user',
+      entityId: targetId,
+      action: 'role_updated',
+      actor: actorId,
+      details: { fromRole: target.role, toRole: newRole },
+    },
+    'user_role_updated',
+  );
+
+  return updated;
 }

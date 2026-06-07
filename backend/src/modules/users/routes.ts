@@ -10,9 +10,12 @@
  *   GET    /editors            — admin                        — paginated editor list
  *   POST   /editors            — admin                        — create editor + welcome email
  *   DELETE /editors/:id        — admin                        — soft-delete editor
+ *   PATCH  /:id/role           — admin                        — change a user's role
  *
  * Ordering rule: `/authors` and `/editors` literal routes go BEFORE param routes
- * so Express doesn't treat "authors" as a slug.
+ * so Express doesn't treat "authors" as a slug. The `:id/role` pattern lives at
+ * the bottom for the same reason — it would otherwise greedily capture literal
+ * segments above it.
  */
 import { Router } from 'express';
 
@@ -26,6 +29,7 @@ import {
   listEditorsHandler,
   removeEditorHandler,
   updateMeHandler,
+  updateUserRoleHandler,
   uploadAvatarHandler,
 } from './controller';
 import {
@@ -34,6 +38,7 @@ import {
   paginationQuerySchema,
   slugParamSchema,
   updateMeBodySchema,
+  updateRoleBodySchema,
 } from './validator';
 
 const router = Router();
@@ -68,6 +73,17 @@ router.delete(
   requireRole('admin'),
   validate({ params: objectIdParamSchema }),
   removeEditorHandler,
+);
+
+// ─── admin: any-user role change ─────────────────────────────────────────
+// Belongs at the bottom so the literal-prefix routes above (`/me`, `/authors`,
+// `/editors`) match first; `/:id/role` would otherwise capture them as ids.
+router.patch(
+  '/:id/role',
+  requireAuth,
+  requireRole('admin'),
+  validate({ params: objectIdParamSchema, body: updateRoleBodySchema }),
+  updateUserRoleHandler,
 );
 
 export default router;
