@@ -301,8 +301,13 @@ export async function updateDraft(input: UpdateDraftInput): Promise<ArticleModel
   }
 
   if (input.patch.mediaIds !== undefined || coverChanged) {
-    const cover =
-      (set.coverImageMediaId as Types.ObjectId | null | undefined) ?? existing.coverImageMediaId;
+    // When the patch explicitly changes the cover (`coverChanged`), trust the
+    // new value even if it's null — Remove sends `coverImageMediaId: null` and
+    // a `??` fallback would incorrectly keep the old cover in `media[]` as an
+    // orphan (#35).
+    const cover = coverChanged
+      ? (set.coverImageMediaId as Types.ObjectId | null)
+      : existing.coverImageMediaId;
     const embeds = input.patch.mediaIds
       ? toObjectIdArray(input.patch.mediaIds)
       : existing.media.filter((m) => m.toString() !== existing.coverImageMediaId?.toString());

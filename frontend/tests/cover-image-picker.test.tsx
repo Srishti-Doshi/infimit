@@ -63,4 +63,54 @@ describe('<CoverImagePicker>', () => {
     expect(onSpy).toHaveBeenCalledWith(null);
     await waitFor(() => expect(screen.getByText(/click to choose/i)).toBeInTheDocument());
   });
+
+  // ─── #34: Replace is atomic ─────────────────────────────────────────
+  // Replace must NOT propagate `onChange(null)` — otherwise the parent's
+  // autosave debounce can fire a `coverImageMediaId: null` PATCH in the
+  // gap between Replace click and the new upload completing, clearing
+  // the cover server-side. Replace now keeps the parent's value
+  // untouched until the new upload resolves.
+
+  it('Replace puts the picker into upload mode without firing onChange', async () => {
+    const user = userEvent.setup();
+    const onSpy = vi.fn();
+    render(
+      <ControlledPicker
+        initial={{ id: 'med_abc', url: 'http://example.com/cover.jpg' }}
+        onSpy={onSpy}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /replace/i }));
+
+    // Uploader is mounted; preview + Replace/Remove are gone.
+    expect(screen.getByText(/click to choose/i)).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /cover preview/i })).not.toBeInTheDocument();
+    // Cancel button is visible so the user can back out.
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+    // Critical: parent's `value` is untouched — no autosave race possible.
+    expect(onSpy).not.toHaveBeenCalled();
+  });
+
+  it('Cancel from replace mode reverts to the preview without firing onChange', async () => {
+    const user = userEvent.setup();
+    const onSpy = vi.fn();
+    render(
+      <ControlledPicker
+        initial={{ id: 'med_abc', url: 'http://example.com/cover.jpg' }}
+        onSpy={onSpy}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /replace/i }));
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+    // Back to preview + Replace/Remove.
+    expect(screen.getByRole('img', { name: /cover preview/i })).toHaveAttribute(
+      'src',
+      'http://example.com/cover.jpg',
+    );
+    expect(screen.getByRole('button', { name: /^replace$/i })).toBeInTheDocument();
+    expect(onSpy).not.toHaveBeenCalled();
+  });
 });
