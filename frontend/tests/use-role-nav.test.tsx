@@ -52,7 +52,7 @@ describe('useRoleNav', () => {
     ]);
   });
 
-  it('returns editor nav with Approvals queue and Pending comments when user role is editor', () => {
+  it('returns editor nav with Approvals queue + Pending comments + My drafts when user role is editor', () => {
     useAuthStore.setState({ user: makeUser('editor') });
     const { result } = renderHook(() => useRoleNav());
     expect(result.current.roleLabel).toBe('Editor');
@@ -60,12 +60,13 @@ describe('useRoleNav', () => {
       'Home',
       'Approvals queue',
       'Pending comments',
+      'My drafts',
       'Notifications',
       'Profile',
     ]);
   });
 
-  it('returns admin nav with Admin console + Articles + Editors + Organisations + E-papers when user role is admin', () => {
+  it('returns admin nav with Admin console + Articles + Editors + Organisations + E-papers + My drafts when user role is admin', () => {
     useAuthStore.setState({ user: makeUser('admin') });
     const { result } = renderHook(() => useRoleNav());
     expect(result.current.roleLabel).toBe('Admin');
@@ -77,6 +78,7 @@ describe('useRoleNav', () => {
       'Editors',
       'Organisations',
       'E-papers',
+      'My drafts',
       'Notifications',
       'Profile',
     ]);
@@ -94,6 +96,7 @@ describe('useRoleNav', () => {
       Editors: '/dashboard/admin/editors',
       Organisations: '/dashboard/admin/organisations',
       'E-papers': '/dashboard/admin/epapers',
+      'My drafts': '/dashboard/author/drafts',
       Notifications: '/dashboard/notifications',
       Profile: '/dashboard/me',
     });
