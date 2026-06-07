@@ -35,7 +35,7 @@ function makeArticle(overrides: {
 }
 
 describe('<AdminArticlesPage>', () => {
-  it('lists published with Unpublish action and unpublished rows as read-only tombstones', async () => {
+  it('lists published with Unpublish action and unpublished with Re-publish action', async () => {
     const published = makeArticle({
       id: 'art_pub_001',
       title: 'A published article',
@@ -66,12 +66,12 @@ describe('<AdminArticlesPage>', () => {
     expect(await screen.findByText('A published article')).toBeInTheDocument();
     expect(screen.getByText('An unpublished article')).toBeInTheDocument();
 
-    // Published row gets the Unpublish action. Unpublished rows are
-    // informational tombstones until the BE supports the unpublished -> published
-    // transition — re-publish would call the BE publishArticle endpoint that
-    // currently rejects anything other than `approved` as the from-state.
+    // Published row gets the Unpublish action; unpublished row gets the
+    // Re-publish action — PR #58 widened BE publishArticle to accept the
+    // `unpublished → published` transition, so this surface now closes the
+    // admin lifecycle loop (closes #50).
     expect(screen.getByRole('button', { name: /^unpublish$/i })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /re-publish/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^re-publish$/i })).toBeInTheDocument();
   });
 
   it('filters out non-published/unpublished statuses (drafts hidden from the surface)', async () => {
@@ -146,5 +146,50 @@ describe('<AdminArticlesPage>', () => {
     await user.click(confirmBtn);
 
     await waitFor(() => expect(unpublishCalledFor).toBe('art_pub_001'));
+  });
+
+  it('opens a confirm modal and posts to /publish when admin Re-publishes', async () => {
+    const user = userEvent.setup();
+    const unpublished = makeArticle({
+      id: 'art_unp_001',
+      title: 'Article to be re-published',
+      slug: 'article-to-be-re-published',
+      status: 'unpublished',
+      publishedAt: '2026-05-30T10:00:00.000Z',
+    });
+
+    let publishCalledFor: string | null = null;
+    server.use(
+      http.get(`${BASE}/articles`, () =>
+        HttpResponse.json({
+          success: true,
+          data: { items: [unpublished], total: 1 },
+        }),
+      ),
+      http.post(`${BASE}/articles/:id/publish`, ({ params }) => {
+        publishCalledFor = params.id as string;
+        return HttpResponse.json({
+          success: true,
+          data: {
+            article: {
+              ...unpublished,
+              status: 'published',
+              publishedAt: '2026-06-08T10:00:00.000Z',
+            },
+          },
+        });
+      }),
+    );
+
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /^re-publish$/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/put.*back live/i)).toBeInTheDocument();
+    const confirmBtn = within(dialog).getByRole('button', { name: /^re-publish$/i });
+    await user.click(confirmBtn);
+
+    await waitFor(() => expect(publishCalledFor).toBe('art_unp_001'));
   });
 });
