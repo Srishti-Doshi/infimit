@@ -7,6 +7,7 @@ from app.middleware.auth_middleware import AuthMiddleware
 from fastapi import FastAPI
 from app.config import settings
 from app.routers.health import router as health_router
+from app.routers.metrics import router as metrics_router
 
 app = FastAPI()
 
@@ -21,6 +22,12 @@ app.include_router(
     health_router,
     prefix="/v1",
     tags=["Health"]
+)
+
+app.include_router(
+    metrics_router,
+    prefix="/v1",
+    tags=["Metrics"]
 )
 
  

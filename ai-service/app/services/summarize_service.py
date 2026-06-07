@@ -1,21 +1,26 @@
-import os
+from app.models.loader import get_groq_client
+from app.utils.cache import get_cache, set_cache
 import logging
-from groq import Groq
-from dotenv import load_dotenv
+import hashlib
 
-load_dotenv()
-
-client = Groq(
-    api_key=os.getenv("GROQ_API_KEY")
-)
-
+ 
 
 logger = logging.getLogger(__name__)
 
 def summarize_text(text: str):
-
+    
+    
     try:
+        # 1. CREATE CACHE KEY (FIRST LINE)
+        cache_key = "summarize:" + hashlib.md5(text.encode()).hexdigest()
 
+        # 2. CHECK CACHE
+        cached_result = get_cache(cache_key)
+        if cached_result:
+            return cached_result
+
+        # 3. LOAD CLIENT
+        client = get_groq_client()
         # Count words
         word_count = len(text.split())
 
@@ -51,7 +56,7 @@ Preserve all important facts, figures, dates, names, and announcements.
 Never add information that is not present in the original article.
 Use a neutral and professional journalistic tone.
 Focus on the most important developments and outcomes.
-Prioritize information related to students, teachers, schools, colleges, universities, examinations, admissions, scholarships, research, academic achievements, educational policies, institutional initiatives, and sports achievements.
+Prioritize information related to students, teachers, schools, colleges, universities, hackathon,seminars,workshops,examinations, admissions, scholarships, research, academic achievements, educational policies, institutional initiatives, and sports achievements.
 Do not remove critical information simply to make the summary shorter.
 Adjust the summary length dynamically based on the importance and density of information.
 If the article contains important dates, deadlines, eligibility criteria, examination details, admission information, scholarship information, or official announcements, ensure they are retained in the summary.
@@ -111,7 +116,11 @@ Polish article
             ]
         )
 
-        return response.choices[0].message.content
+        result = response.choices[0].message.content
+        
+        set_cache(cache_key, result, ttl=3600)
+
+        return result
 
     except Exception as e:
           logger.exception(f"AI Service Error: {e}")

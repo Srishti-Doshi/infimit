@@ -8,7 +8,7 @@ from app.schemas.summarize import SummaryRequest
 from app.services.summarize_service import summarize_text
 from app.services.logger import log_request
 from app.middleware.rate_limiter import is_rate_limited
-
+from app.utils.text import clean_text, truncate_text
 router = APIRouter()
 
 # Summarize input text using the AI model

@@ -1,4 +1,5 @@
 # Store application metrics
+from app.models.metrics_model import MetricsResponse
 
 metrics = {
     "total_requests": 0,
