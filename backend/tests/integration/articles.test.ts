@@ -262,6 +262,60 @@ describe('PATCH /v1/articles/:id', () => {
     expect(res.body.data.article.body).not.toMatch(/script/);
     expect(res.body.data.article.body).not.toMatch(/alert/);
   });
+
+  // ─── #35: media[] reconciliation when cover changes ──────────────────
+  // Pre-fix, `??` falsely treated `set.coverImageMediaId = null` as "no
+  // change" and re-added the previous cover into `media[]`. These two cases
+  // cover Remove and Replace; both used to leak the old cover as an orphan.
+
+  it('Remove (coverImageMediaId=null) drops the old cover from media[] and decrements its refCount', async () => {
+    const author = await seedUser('author');
+    const coverA = await seedCoverMedia(author.id);
+    const created = await request(app)
+      .post('/v1/articles')
+      .set('Authorization', `Bearer ${author.token}`)
+      .send(VALID_CREATE_BODY(coverA));
+    const articleId = created.body.data.article.id;
+
+    const patch = await request(app)
+      .patch(`/v1/articles/${articleId}`)
+      .set('Authorization', `Bearer ${author.token}`)
+      .send({ coverImageMediaId: null, version: 0 });
+    expect(patch.status).toBe(200);
+
+    const after = await Article.findById(articleId);
+    expect(after?.coverImageMediaId).toBeNull();
+    expect((after?.media ?? []).map((m) => m.toString())).toEqual([]);
+
+    const mediaA = await Media.findById(coverA);
+    expect(mediaA?.refCount).toBe(0);
+  });
+
+  it('Replace (coverImageMediaId A→B) drops A from media[] and leaves only B', async () => {
+    const author = await seedUser('author');
+    const coverA = await seedCoverMedia(author.id);
+    const coverB = await seedCoverMedia(author.id);
+    const created = await request(app)
+      .post('/v1/articles')
+      .set('Authorization', `Bearer ${author.token}`)
+      .send(VALID_CREATE_BODY(coverA));
+    const articleId = created.body.data.article.id;
+
+    const patch = await request(app)
+      .patch(`/v1/articles/${articleId}`)
+      .set('Authorization', `Bearer ${author.token}`)
+      .send({ coverImageMediaId: coverB, version: 0 });
+    expect(patch.status).toBe(200);
+
+    const after = await Article.findById(articleId);
+    expect(after?.coverImageMediaId?.toString()).toBe(coverB);
+    expect((after?.media ?? []).map((m) => m.toString())).toEqual([coverB]);
+
+    const mediaA = await Media.findById(coverA);
+    const mediaB = await Media.findById(coverB);
+    expect(mediaA?.refCount).toBe(0);
+    expect(mediaB?.refCount).toBe(1);
+  });
 });
 
 // ─── GET /v1/articles/:id ───────────────────────────────────────────────
