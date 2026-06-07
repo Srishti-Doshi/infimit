@@ -1,4 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
+import { useMutation } from '@tanstack/react-query';
 import {
   BookOpen,
   Facebook,
@@ -6,6 +7,7 @@ import {
   Home,
   Info,
   Linkedin,
+  LogOut,
   Mail,
   Newspaper,
   Search,
@@ -14,10 +16,13 @@ import {
   X,
 } from 'lucide-react';
 import { type ComponentType, type SVGProps } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 
-import { Button, Input } from '@/components/ui';
+import { Button, Input, toast } from '@/components/ui';
+import { logout } from '@/lib/auth-api';
 import { cn } from '@/lib/cn';
+import { useRoleNav } from '@/lib/use-role-nav';
+import { useAuthStore } from '@/store/auth-store';
 import { useUIStore } from '@/store';
 
 interface NavItem {
@@ -59,10 +64,30 @@ const SOCIAL_LINKS = [
  * blocks page scroll while open, and dismisses on overlay tap or Escape.
  * NavLink reflects the active route automatically; `Dialog.Close asChild`
  * wrapping each link closes the drawer when the user navigates.
+ *
+ * When the user is signed in, a role-aware section renders at the top of
+ * the drawer (role badge + per-role items from `useRoleNav`). The existing
+ * reader categories remain below so signed-in users can still browse the
+ * public site from within their dashboard context. Sign-out replaces the
+ * sign-in/register CTAs at the bottom when signed in.
  */
 export function Sidebar(): JSX.Element {
+  const navigate = useNavigate();
   const isOpen = useUIStore((s) => s.isSidebarOpen);
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
+  const user = useAuthStore((s) => s.user);
+  const { isAuthed, roleLabel, items: roleItems } = useRoleNav();
+
+  const logoutMutation = useMutation({
+    mutationFn: logout,
+    onSettled: () => {
+      useAuthStore.getState().clear();
+      setSidebarOpen(false);
+      toast.success('Signed out');
+      navigate('/', { replace: true });
+    },
+  });
+
   return (
     <Dialog.Root open={isOpen} onOpenChange={setSidebarOpen}>
       <Dialog.Portal>
@@ -93,6 +118,23 @@ export function Sidebar(): JSX.Element {
               />
             </div>
 
+            {isAuthed && user ? (
+              <div className="border-b border-line">
+                <div className="px-4 pt-4">
+                  <p className="text-body-xs font-semibold uppercase tracking-wider text-ink-tertiary">
+                    Signed in as {roleLabel}
+                  </p>
+                  <p
+                    className="mt-0.5 truncate text-body-sm font-medium text-ink-primary"
+                    title={user.name}
+                  >
+                    {user.name}
+                  </p>
+                </div>
+                <NavList items={roleItems} />
+              </div>
+            ) : null}
+
             <NavList items={PRIMARY_ITEMS} />
 
             <div className="border-t border-line">
@@ -103,20 +145,36 @@ export function Sidebar(): JSX.Element {
             </div>
 
             <div className="space-y-3 border-t border-line p-4">
-              <Dialog.Close asChild>
-                <Link to="/auth/login" className="block">
-                  <Button variant="outline" size="md" className="w-full">
-                    Sign in
-                  </Button>
-                </Link>
-              </Dialog.Close>
-              <Dialog.Close asChild>
-                <Link to="/auth/register" className="block">
-                  <Button variant="primary" size="md" className="w-full">
-                    Create account
-                  </Button>
-                </Link>
-              </Dialog.Close>
+              {isAuthed ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="md"
+                  className="w-full"
+                  iconLeft={<LogOut className="h-4 w-4" aria-hidden="true" />}
+                  loading={logoutMutation.isPending}
+                  onClick={() => logoutMutation.mutate()}
+                >
+                  Sign out
+                </Button>
+              ) : (
+                <>
+                  <Dialog.Close asChild>
+                    <Link to="/auth/login" className="block">
+                      <Button variant="outline" size="md" className="w-full">
+                        Sign in
+                      </Button>
+                    </Link>
+                  </Dialog.Close>
+                  <Dialog.Close asChild>
+                    <Link to="/auth/register" className="block">
+                      <Button variant="primary" size="md" className="w-full">
+                        Create account
+                      </Button>
+                    </Link>
+                  </Dialog.Close>
+                </>
+              )}
             </div>
 
             <div className="border-t border-line bg-surface-subtle px-4 py-5">
