@@ -122,6 +122,19 @@ async function seedPublishedArticle(authorId: string): Promise<{
   return { ...seeded, version: seeded.version + 1 };
 }
 
+async function seedUnpublishedArticle(authorId: string): Promise<{
+  id: string;
+  version: number;
+  slug: string;
+}> {
+  const seeded = await seedPublishedArticle(authorId);
+  await Article.updateOne(
+    { _id: seeded.id },
+    { $set: { status: 'unpublished' }, $inc: { version: 1 } },
+  );
+  return { ...seeded, version: seeded.version + 1 };
+}
+
 /** Tiny helper to let setImmediate-scheduled AI pipelines complete. */
 async function flushSetImmediate(): Promise<void> {
   await new Promise((resolve) => setImmediate(resolve));
@@ -328,6 +341,21 @@ describe('POST /v1/articles/:id/publish', () => {
       .post(`/v1/articles/${id}/publish`)
       .set('Authorization', `Bearer ${author.token}`);
     expect(res.status).toBe(403);
+  });
+
+  it('editor re-publishes an unpublished article → status=published, publishedAt freshened', async () => {
+    const author = await seedUser('author');
+    const editor = await seedUser('editor');
+    const { id } = await seedUnpublishedArticle(author.id);
+
+    const before = Date.now();
+    const res = await request(app)
+      .post(`/v1/articles/${id}/publish`)
+      .set('Authorization', `Bearer ${editor.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.article.status).toBe('published');
+    expect(new Date(res.body.data.article.publishedAt).getTime()).toBeGreaterThanOrEqual(before);
   });
 });
 
