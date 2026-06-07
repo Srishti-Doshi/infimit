@@ -25,6 +25,8 @@ import { useRoleNav } from '@/lib/use-role-nav';
 import { useAuthStore } from '@/store/auth-store';
 import { useUIStore } from '@/store';
 
+import { WriteArticleButton } from './write-article-button';
+
 interface NavItem {
   label: string;
   href: string;
@@ -136,17 +138,21 @@ export function Sidebar(): JSX.Element {
                     {user.name}
                   </p>
                 </div>
-                <NavList items={roleItems} />
+                {/* Primary CTA — only renders for roles that can create drafts. Closes #53. */}
+                <div className="px-4 pt-3">
+                  <WriteArticleButton onBeforeNavigate={() => setSidebarOpen(false)} />
+                </div>
+                <NavList items={roleItems} onItemClick={() => setSidebarOpen(false)} />
               </div>
             ) : null}
 
-            <NavList items={primaryItems} />
+            <NavList items={primaryItems} onItemClick={() => setSidebarOpen(false)} />
 
             <div className="border-t border-line">
               <p className="px-4 pt-4 text-body-xs font-semibold uppercase tracking-wider text-ink-tertiary">
                 Categories
               </p>
-              <NavList items={CATEGORY_ITEMS} />
+              <NavList items={CATEGORY_ITEMS} onItemClick={() => setSidebarOpen(false)} />
             </div>
 
             <div className="space-y-3 border-t border-line p-4">
@@ -207,28 +213,41 @@ export function Sidebar(): JSX.Element {
   );
 }
 
-function NavList({ items }: { items: NavItem[] }): JSX.Element {
+function NavList({
+  items,
+  onItemClick,
+}: {
+  items: NavItem[];
+  /**
+   * Called when a NavLink is clicked. The drawer passes `setSidebarOpen(false)`
+   * here so the drawer closes on navigation. Previously this was done by
+   * wrapping each NavLink in `Dialog.Close asChild`, but Radix's Slot mechanism
+   * stringifies NavLink's function-returning className (turns the function
+   * source into the literal `class` attribute) — leaving items completely
+   * unstyled. Surfaced during #53 verification; fixed inline here.
+   */
+  onItemClick?: () => void;
+}): JSX.Element {
   return (
     <ul className="py-2">
       {items.map((item) => (
         <li key={item.href}>
-          <Dialog.Close asChild>
-            <NavLink
-              to={item.href}
-              end={item.end}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 px-4 py-2.5 text-body-sm transition-colors',
-                  isActive
-                    ? 'bg-surface-subtle font-semibold text-ink-primary'
-                    : 'text-ink-secondary hover:bg-surface-subtle hover:text-ink-primary',
-                )
-              }
-            >
-              <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>{item.label}</span>
-            </NavLink>
-          </Dialog.Close>
+          <NavLink
+            to={item.href}
+            end={item.end}
+            onClick={onItemClick}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 px-5 py-3 text-body-sm transition-colors',
+                isActive
+                  ? 'bg-surface-subtle font-semibold text-ink-primary'
+                  : 'text-ink-secondary hover:bg-surface-subtle hover:text-ink-primary',
+              )
+            }
+          >
+            <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{item.label}</span>
+          </NavLink>
         </li>
       ))}
     </ul>

@@ -8,6 +8,8 @@ import { cn } from '@/lib/cn';
 import { useRoleNav } from '@/lib/use-role-nav';
 import { useAuthStore } from '@/store/auth-store';
 
+import { WriteArticleButton } from './write-article-button';
+
 /**
  * DashboardSidebar — persistent left-rail navigation on `/dashboard/*` routes.
  *
@@ -53,6 +55,11 @@ export function DashboardSidebar(): JSX.Element | null {
         <p className="truncate text-body-sm text-ink-secondary" title={user.name}>
           {user.name}
         </p>
+      </div>
+
+      {/* Primary CTA — only renders for roles that can create drafts. Closes #53. */}
+      <div className="border-b border-line p-3">
+        <WriteArticleButton />
       </div>
 
       <nav aria-label="Dashboard navigation" className="flex-1 overflow-y-auto py-3">

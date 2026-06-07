@@ -4,6 +4,7 @@ export { DashboardSidebar } from './dashboard-sidebar';
 export { Header } from './header';
 export { Footer } from './footer';
 export { Sidebar } from './sidebar';
+export { WriteArticleButton } from './write-article-button';
 export { SkipToContent } from './skip-to-content';
 export { Logo } from './logo';
 export { UtilityBar } from './utility-bar';
