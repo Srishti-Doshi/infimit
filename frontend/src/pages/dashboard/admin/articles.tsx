@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ExternalLink, FileText, Undo2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, FileText, Redo2, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -17,7 +17,7 @@ import {
   Skeleton,
   toast,
 } from '@/components/ui';
-import { listArticles, unpublishArticle } from '@/lib/articles-api';
+import { listArticles, publishArticle, unpublishArticle } from '@/lib/articles-api';
 import { ARTICLE_CATEGORY_LABELS } from '@/lib/articles-schema';
 import { toastError } from '@/lib/error-messages';
 import type { ApiError } from '@/types/api';
@@ -27,29 +27,26 @@ import type { Article } from '@/types/article';
  * AdminArticlesPage (`/dashboard/admin/articles`).
  *
  * Surfaces the missing admin-side article-management UI flagged in #50.
- * Subphase 4's BE shipped Unpublish + Re-publish endpoints; this page is
- * the FE half that was meant to ship alongside but didn't. Lets admin:
+ * Subphase 4's BE shipped Unpublish + Re-publish endpoints; this page is the
+ * FE half that closes the loop. Admin can:
  *
  *   - See every article in `published` or `unpublished` state.
  *   - Take a published article offline (`POST /:id/unpublish`).
+ *   - Put an unpublished article back live (`POST /:id/publish`, now accepts
+ *     the `unpublished → published` transition since PR #58 widened
+ *     `publishArticle`).
  *   - Hop to the public reader for any live article.
- *
- * **Unpublished articles render as read-only tombstones for now.** Re-publish
- * (`unpublished → published`) isn't supported by the BE today —
- * `publishArticle` in `backend/src/modules/articles/service.ts` only accepts
- * `approved` as the from-state. Tracked as #54 — Prince's next BE session
- * decides whether `unpublished → published` skips the approval pipeline or
- * re-runs it. Once #54 lands, FE adds the Re-publish button back via a small
- * follow-up PR.
  *
  * Out of scope for this MVP (file follow-ups if hit during real use):
  *   - Status filter tabs (Published / Unpublished / Draft / All).
  *   - Pagination, search, sort.
  *   - Placement edit + bulk actions.
- *   - Author name in the row (blocked on #45/#46 BE populate work).
+ *   - Author name in the row (BE populate landed via #59; rendering it on
+ *     this surface is a separate cosmetic follow-up).
  */
 
-type ActionTarget = { kind: 'unpublish'; article: Article } | null;
+type ActionKind = 'unpublish' | 'republish';
+type ActionTarget = { kind: ActionKind; article: Article } | null;
 
 export default function AdminArticlesPage(): JSX.Element {
   const [action, setAction] = useState<ActionTarget>(null);
@@ -145,7 +142,7 @@ export default function AdminArticlesPage(): JSX.Element {
 
 interface ArticleRowProps {
   article: Article;
-  onAction: (kind: 'unpublish') => void;
+  onAction: (kind: ActionKind) => void;
 }
 
 function ArticleRow({ article, onAction }: ArticleRowProps): JSX.Element {
@@ -184,9 +181,14 @@ function ArticleRow({ article, onAction }: ArticleRowProps): JSX.Element {
             </Button>
           </div>
         ) : (
-          // Unpublished rows are read-only tombstones until the BE supports
-          // `unpublished → published` (see header docstring + linked issue).
-          <span className="text-body-xs text-ink-tertiary">—</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconLeft={<Redo2 className="h-4 w-4" aria-hidden="true" />}
+            onClick={() => onAction('republish')}
+          >
+            Re-publish
+          </Button>
         )}
       </Td>
     </tr>
@@ -202,10 +204,16 @@ interface ConfirmActionModalProps {
 }
 
 function ConfirmActionModal({ action, onClose, onSettled }: ConfirmActionModalProps): JSX.Element {
+  // Both actions hit a single article-id POST endpoint and return the updated
+  // article. Branch on `kind` inside the mutation fn so the React Query cache
+  // invalidation path stays unified.
   const mutation = useMutation({
-    mutationFn: (target: NonNullable<ActionTarget>) => unpublishArticle(target.article.id),
-    onSuccess: () => {
-      toast.success('Article unpublished');
+    mutationFn: (target: NonNullable<ActionTarget>) =>
+      target.kind === 'unpublish'
+        ? unpublishArticle(target.article.id)
+        : publishArticle(target.article.id),
+    onSuccess: (_data, target) => {
+      toast.success(target.kind === 'unpublish' ? 'Article unpublished' : 'Article re-published');
       onSettled();
     },
     onError: (error: ApiError['error']) => {
@@ -215,14 +223,26 @@ function ConfirmActionModal({ action, onClose, onSettled }: ConfirmActionModalPr
   });
 
   const open = action !== null;
+  const isRepublish = action?.kind === 'republish';
+  const title = isRepublish ? 'Re-publish article' : 'Unpublish article';
+  const cta = isRepublish ? 'Re-publish' : 'Unpublish';
 
   return (
     <Modal open={open} onOpenChange={(o) => !o && onClose()} size="sm">
       <ModalBody className="px-6 py-7 sm:px-8">
-        <ModalTitle>Unpublish article</ModalTitle>
+        <ModalTitle>{title}</ModalTitle>
         <ModalDescription className="mt-2">
-          Take <strong className="text-ink-primary">{action?.article.title}</strong> offline. The
-          public page will start returning 404 immediately, and the author is notified.
+          {isRepublish ? (
+            <>
+              Put <strong className="text-ink-primary">{action?.article.title}</strong> back live.
+              The public page will be reachable again immediately, and the author is notified.
+            </>
+          ) : (
+            <>
+              Take <strong className="text-ink-primary">{action?.article.title}</strong> offline.
+              The public page will start returning 404 immediately, and the author is notified.
+            </>
+          )}
         </ModalDescription>
         <div className="mt-6 flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
@@ -234,7 +254,7 @@ function ConfirmActionModal({ action, onClose, onSettled }: ConfirmActionModalPr
             loading={mutation.isPending}
             onClick={() => action && mutation.mutate(action)}
           >
-            Unpublish
+            {cta}
           </Button>
         </div>
       </ModalBody>
