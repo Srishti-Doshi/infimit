@@ -1,5 +1,5 @@
 /**
- * Database seed — Subphase 2.
+ * Database seed — Subphase 2 (plus the author addition from PR closing #33).
  *
  * Idempotent: re-running this script never duplicates records. Each insert
  * checks for an existing row by its unique key first (email for users, slug
@@ -11,6 +11,9 @@
  *                                                          shared environment)
  *   1× organisation      "Infimit Demo College" (slug: infimit-demo-college)
  *   2× editor users      bound to a subset of the 5 article categories
+ *   1× author user       author@infimit.dev — bootstraps the editorial flow
+ *                        for QA / dev work without needing the admin promote
+ *                        UI (closes #33's "no path to a real author account").
  *   5× article categories logged for visibility (enum lives in
  *                        src/shared/constants/articleCategories.ts — no
  *                        categories collection until articles ship in
@@ -18,6 +21,8 @@
  *
  * Run with:  npx tsx scripts/seed.ts
  */
+import { Types } from 'mongoose';
+
 import { loadEnv } from '../src/config/env';
 import { connectMongo, disconnectMongo } from '../src/config/db';
 import { logger } from '../src/config/logger';
@@ -28,6 +33,10 @@ import * as orgsRepo from '../src/modules/organisations/repository';
 
 const ADMIN_EMAIL = 'admin@infimit.dev';
 const ADMIN_PASSWORD = 'Admin12345!';
+
+const AUTHOR_EMAIL = 'author@infimit.dev';
+const AUTHOR_NAME = 'Demo Author';
+const AUTHOR_SLUG = 'demo-author';
 
 const ORG_SLUG = 'infimit-demo-college';
 
@@ -104,6 +113,24 @@ async function seedEditor(editor: SeedEditor): Promise<{ created: boolean; id: s
   return { created: true, id: user._id.toString() };
 }
 
+async function seedAuthor(organisationId: string): Promise<{ created: boolean; id: string }> {
+  const existing = await usersRepo.findActiveByEmail(AUTHOR_EMAIL);
+  if (existing) {
+    return { created: false, id: existing._id.toString() };
+  }
+  const passwordHash = await hashPassword(ADMIN_PASSWORD);
+  const user = await usersRepo.createUser({
+    email: AUTHOR_EMAIL,
+    passwordHash,
+    name: AUTHOR_NAME,
+    role: 'author',
+    slug: AUTHOR_SLUG,
+    organisationId: new Types.ObjectId(organisationId),
+  });
+  await usersRepo.updateById(user._id, { isEmailVerified: true });
+  return { created: true, id: user._id.toString() };
+}
+
 async function main(): Promise<void> {
   loadEnv();
   await connectMongo();
@@ -119,6 +146,9 @@ async function main(): Promise<void> {
     const result = await seedEditor(editor);
     logger.info({ id: result.id, email: editor.email, created: result.created }, 'seed_editor');
   }
+
+  const author = await seedAuthor(org.id);
+  logger.info({ id: author.id, email: AUTHOR_EMAIL, created: author.created }, 'seed_author');
 
   logger.info({ categories: ARTICLE_CATEGORIES }, 'seed_article_categories_enum');
 

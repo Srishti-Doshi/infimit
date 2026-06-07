@@ -3,6 +3,10 @@
  *
  * Implements ONLY the operations used by the auth module:
  *   - set(key, value, 'EX', seconds)
+ *   - set(key, value, 'EX', seconds, 'NX')   — atomic test-and-set (returns
+ *                                              `null` when key already exists;
+ *                                              used by single-use token consume
+ *                                              flows like verify-email).
  *   - get(key)
  *   - exists(key)
  *   - del(key1, key2, ...)
@@ -35,7 +39,20 @@ class InMemoryRedis {
     return e;
   }
 
-  async set(key: string, value: string, mode?: string, seconds?: number): Promise<'OK'> {
+  async set(
+    key: string,
+    value: string,
+    mode?: string,
+    seconds?: number,
+    nx?: string,
+  ): Promise<'OK' | null> {
+    // `NX` semantics: only set if the key doesn't already exist. Required for
+    // the race-free single-use-token consume pattern in auth/blocklist.ts.
+    // Accepted as the 3rd arg (`set(key, val, 'NX')`) OR 5th arg (`'EX', n, 'NX'`).
+    const nxMode = mode === 'NX' || nx === 'NX';
+    if (nxMode && this.prune(key) !== undefined) {
+      return null;
+    }
     let expiresAt: number | null = null;
     if (mode === 'EX' && typeof seconds === 'number') {
       expiresAt = Date.now() + seconds * 1000;

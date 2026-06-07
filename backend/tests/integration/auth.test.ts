@@ -170,6 +170,11 @@ describe('POST /v1/auth/login', () => {
       .send({ email: READER.email, password: READER.password });
     expect(res.status).toBe(429);
     expect(res.body.error.code).toBe('RATE_LIMITED');
+    // FE needs the actual lockout duration to render "try again in 15 min"
+    // copy correctly (issue #30). retryAfterSec lives in error.details; the
+    // standard Retry-After header is set by errorHandler.
+    expect(res.body.error.details.retryAfterSec).toBeGreaterThan(0);
+    expect(res.headers['retry-after']).toBe(String(res.body.error.details.retryAfterSec));
   }, 30_000);
 });
 
@@ -245,6 +250,81 @@ describe('POST /v1/auth/refresh + /logout', () => {
       .set('X-Forwarded-For', ip)
       .set('Cookie', refresh);
     expect(refreshAfter.status).toBe(401);
+  });
+
+  it('logout blocklists the access token — old access can no longer hit /me (#28)', async () => {
+    // Without access-jti blocklisting, the old access token would remain valid
+    // for up to 15 min after the user clicks Sign out — enough that a parallel
+    // tab keeps working (the actual #28 repro). Pin the fix here.
+    const ip = nextTestIp();
+    const reg = await request(app)
+      .post('/v1/auth/register')
+      .set('X-Forwarded-For', ip)
+      .send({ role: 'reader', ...READER });
+
+    const accessToken = reg.body.data.accessToken;
+    const cookies = (reg.headers['set-cookie'] as unknown as string[]) ?? [];
+    const refresh = cookies.find((c) => c.startsWith('refresh_token='))!;
+
+    // Sanity check: /me works before logout.
+    const meBefore = await request(app)
+      .get('/v1/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(meBefore.status).toBe(200);
+
+    const out = await request(app)
+      .post('/v1/auth/logout')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Cookie', refresh)
+      .set('X-Forwarded-For', ip);
+    expect(out.status).toBe(204);
+
+    // The same access token is now blocklisted — authGuard rejects it.
+    const meAfter = await request(app)
+      .get('/v1/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(meAfter.status).toBe(401);
+  });
+});
+
+describe('POST /v1/auth/verify-email', () => {
+  it('concurrent verify-email calls race-free — exactly one 200, the rest 401 (#22)', async () => {
+    // Seed a fresh unverified user + mint a verify token directly. Firing two
+    // requests in parallel previously raced through the read-then-write
+    // blocklist; the SET NX consume primitive serialises them so exactly one
+    // wins and the rest see 401.
+    const { randomUUID } = await import('node:crypto');
+    const { User } = await import('@/modules/users');
+    const { hashPassword, signPurposeToken } = await import('@/shared/crypto');
+
+    const user = await User.create({
+      email: `verify-race-${randomUUID().slice(0, 6)}@test.dev`,
+      name: 'Race Tester',
+      passwordHash: await hashPassword('Pa55word!!'),
+      role: 'reader',
+      isEmailVerified: false,
+      isActive: true,
+    });
+    const jti = randomUUID();
+    const token = signPurposeToken({ sub: user._id.toString(), jti, purpose: 'verify' }, '24h');
+
+    const [a, b] = await Promise.all([
+      request(app)
+        .post('/v1/auth/verify-email')
+        .set('X-Forwarded-For', nextTestIp())
+        .send({ token }),
+      request(app)
+        .post('/v1/auth/verify-email')
+        .set('X-Forwarded-For', nextTestIp())
+        .send({ token }),
+    ]);
+
+    const statuses = [a.status, b.status].sort();
+    expect(statuses).toEqual([200, 401]);
+
+    // The losing response should carry the "already used" error code.
+    const loser = a.status === 401 ? a : b;
+    expect(loser.body.error.code).toBe('INVALID_TOKEN');
   });
 });
 

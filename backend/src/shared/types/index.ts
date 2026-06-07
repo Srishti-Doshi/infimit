@@ -8,12 +8,17 @@ export type UserRole = 'reader' | 'author' | 'editor' | 'admin';
 /**
  * Auth context attached to req.user by the authGuard middleware.
  * Skeleton in Subphase 1 — populated by Subphase 2.
+ *
+ * `jti` and `exp` are needed for access-token blocklisting on logout — see
+ * `auth/service.ts:logoutUser` and `middleware/authGuard.ts` blocklist check.
  */
 export interface AuthContext {
   id: string;
   role: UserRole;
   organisationId?: string;
   email: string;
+  jti: string;
+  exp: number;
 }
 
 export interface Paginated<T> {

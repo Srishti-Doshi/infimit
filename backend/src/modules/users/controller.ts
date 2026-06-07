@@ -19,8 +19,9 @@ import {
   listEditors,
   removeEditor,
   updateMe,
+  updateUserRole,
 } from './service';
-import type { CreateEditorBody, PaginationQuery, UpdateMeBody } from './validator';
+import type { CreateEditorBody, PaginationQuery, UpdateMeBody, UpdateRoleBody } from './validator';
 
 export const getMeHandler = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
@@ -114,4 +115,17 @@ export const removeEditorHandler = asyncHandler(async (req: Request, res: Respon
   const { id } = req.params as { id: string };
   await removeEditor(req.user.id, id);
   res.status(204).send();
+});
+
+export const updateUserRoleHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw ApiError.unauthorized();
+  }
+  const { id } = req.params as { id: string };
+  const body = req.body as UpdateRoleBody;
+  const user = await updateUserRole(req.user.id, id, body.role);
+  res.status(200).json({
+    success: true,
+    data: { user: user.toJSON() },
+  });
 });

@@ -187,6 +187,95 @@ describe('Admin editor lifecycle', () => {
   });
 });
 
+describe('PATCH /v1/users/:id/role', () => {
+  it('admin promotes a reader to author and a slug is auto-generated', async () => {
+    const admin = await seedUser('admin');
+    const reader = await seedUser('reader');
+
+    const res = await request(app)
+      .patch(`/v1/users/${reader.id}/role`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ role: 'author' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.role).toBe('author');
+    expect(typeof res.body.data.user.slug).toBe('string');
+    expect(res.body.data.user.slug.length).toBeGreaterThan(0);
+  });
+
+  it('non-admin (editor) gets 403', async () => {
+    const editor = await seedUser('editor');
+    const reader = await seedUser('reader');
+
+    const res = await request(app)
+      .patch(`/v1/users/${reader.id}/role`)
+      .set('Authorization', `Bearer ${editor.token}`)
+      .send({ role: 'author' });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('admin cannot change their own role', async () => {
+    const admin = await seedUser('admin');
+
+    const res = await request(app)
+      .patch(`/v1/users/${admin.id}/role`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ role: 'editor' });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('cannot demote the only active admin (last-admin guard)', async () => {
+    // The guard is reachable in one realistic scenario: an admin's JWT still
+    // claims admin (15-min TTL) AFTER they were demoted in the DB. Their old
+    // token then attempts to demote the remaining admin, and the guard fires
+    // because DB adminCount is 1.
+    const a1 = await seedUser('admin');
+    const a2 = await seedUser('admin');
+
+    // A2 demotes A1 — succeeds. DB now: 1 admin (A2). A1's token still claims
+    // admin until it expires.
+    const demoteA1 = await request(app)
+      .patch(`/v1/users/${a1.id}/role`)
+      .set('Authorization', `Bearer ${a2.token}`)
+      .send({ role: 'reader' });
+    expect(demoteA1.status).toBe(200);
+
+    // A1's old JWT still passes authGuard + requireRole('admin'). Attempt to
+    // demote A2 → DB shows only one admin, guard fires.
+    const demoteA2 = await request(app)
+      .patch(`/v1/users/${a2.id}/role`)
+      .set('Authorization', `Bearer ${a1.token}`)
+      .send({ role: 'reader' });
+    expect(demoteA2.status).toBe(403);
+    expect(demoteA2.body.error.message).toContain('last admin');
+  });
+
+  it('role change is idempotent — same role is a 200 no-op', async () => {
+    const admin = await seedUser('admin');
+    const reader = await seedUser('reader');
+
+    const res = await request(app)
+      .patch(`/v1/users/${reader.id}/role`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ role: 'reader' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.role).toBe('reader');
+  });
+
+  it('rejects an invalid role value', async () => {
+    const admin = await seedUser('admin');
+    const reader = await seedUser('reader');
+
+    const res = await request(app)
+      .patch(`/v1/users/${reader.id}/role`)
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({ role: 'superuser' });
+    expect(res.status).toBe(422);
+  });
+});
+
 describe('GET /v1/users/authors/:slug', () => {
   it('returns 404 for a deleted author', async () => {
     const admin = await seedUser('admin');

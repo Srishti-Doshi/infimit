@@ -4,26 +4,31 @@
  * Contract:
  *   - Reads `Authorization: Bearer <jwt>` from the request.
  *   - Verifies the JWT signature + standard claims (exp, iat) via shared/crypto.
- *   - Populates `req.user` with the AuthContext shape.
- *
- * Access tokens are short-lived (15 min) and intentionally NOT blocklisted —
- * the safety margin is acceptable per docs/10-security.md §10.2. Refresh-token
- * revocation (logout, password change) is enforced at the refresh path, not
- * here. By 15 min after revocation, no new access token can be minted.
+ *   - Checks the access-token `jti` against the Redis blocklist (closes the
+ *     up-to-15-min window where a stolen or shared access token would otherwise
+ *     remain usable after `/logout`).
+ *   - Populates `req.user` with the AuthContext shape (incl. `jti` + `exp` so
+ *     `logoutUser` can blocklist this access token).
  *
  * Errors:
  *   - 401 UNAUTHORIZED when header is missing/malformed, token is invalid,
- *     expired, or has the wrong shape. Generic message — never reveal whether
- *     a specific token was "expired vs invalid signature" to an attacker.
+ *     expired, blocklisted, or has the wrong shape. Generic message — never
+ *     reveal whether a failure was signature / expiry / blocklisted to an
+ *     attacker.
+ *
+ * Perf: the blocklist check is a single Redis `EXISTS` (~1ms). Acceptable cost
+ * for plugging the post-logout access-token reuse window — see
+ * docs/10-security.md §10.2 and issue #28.
  */
 import type { NextFunction, Request, Response } from 'express';
 
 import { ApiError } from '@/shared/errors';
 import { verifyAccessToken } from '@/shared/crypto';
+import { isJtiBlocklisted } from '@/modules/auth/blocklist';
 
 const BEARER_PREFIX = 'Bearer ';
 
-export function requireAuth(req: Request, _res: Response, next: NextFunction): void {
+export async function requireAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const header = req.headers.authorization;
   if (!header || !header.startsWith(BEARER_PREFIX)) {
     next(ApiError.unauthorized('Missing or malformed Authorization header'));
@@ -46,10 +51,20 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
     return;
   }
 
+  // Reject tokens whose jti was blocklisted (logout, password change, etc.).
+  // Use the same generic message as other auth failures — don't disclose that
+  // the token is structurally valid but revoked.
+  if (await isJtiBlocklisted(payload.jti)) {
+    next(ApiError.unauthorized('Invalid or expired access token'));
+    return;
+  }
+
   req.user = {
     id: payload.sub,
     email: payload.email,
     role: payload.role,
+    jti: payload.jti,
+    exp: payload.exp,
     ...(payload.organisationId ? { organisationId: payload.organisationId } : {}),
   };
   next();

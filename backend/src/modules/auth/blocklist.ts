@@ -31,6 +31,23 @@ export async function blocklistJti(jti: string, expiresAt: Date): Promise<void> 
 }
 
 /**
+ * Atomic test-and-consume — writes the blocklist entry only if it doesn't
+ * already exist. Returns true when this caller wins the race (jti was fresh);
+ * false when the jti was already consumed by a concurrent caller.
+ *
+ * Used by single-use tokens (verify-email, password-reset) where the previous
+ * `check + write` pattern had a TOCTOU race (two concurrent verify requests
+ * both passed `isJtiBlocklisted` before either committed `blocklistJti`).
+ * Redis `SET NX EX` is atomic, so exactly one caller succeeds.
+ */
+export async function consumeJti(jti: string, expiresAt: Date): Promise<boolean> {
+  const ttlSeconds = Math.max(1, Math.ceil((expiresAt.getTime() - Date.now()) / 1000));
+  const redis = getRedis();
+  const result = await redis.set(BLOCKLIST_KEY(jti), '1', 'EX', ttlSeconds, 'NX');
+  return result === 'OK';
+}
+
+/**
  * O(1) check used by authGuard and the refresh path. Returns true if the jti
  * is currently in the blocklist (i.e., the token must be rejected).
  */
