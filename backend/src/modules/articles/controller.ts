@@ -94,7 +94,7 @@ export const listArticlesHandler = asyncHandler(async (req: Request, res: Respon
   res.status(200).json({
     success: true,
     data: {
-      items: result.items.map((a) => a.toJSON()),
+      items: result.items,
       total: result.total,
       page: result.page,
       limit: result.limit,
