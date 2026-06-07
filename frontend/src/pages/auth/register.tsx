@@ -74,7 +74,10 @@ export default function RegisterPage(): JSX.Element {
     <Modal
       open
       onOpenChange={(open) => {
-        if (!open) navigate(next ?? '/', { replace: true });
+        // See `login.tsx` — dismiss must always go home, never to `next`,
+        // or RequireAuth bounces back into the modal and it looks like the
+        // modal is reopening (#29). `next` still honoured on success below.
+        if (!open) navigate('/', { replace: true });
       }}
       size="md"
     >
