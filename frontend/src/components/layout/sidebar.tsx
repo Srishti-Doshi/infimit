@@ -88,6 +88,11 @@ export function Sidebar(): JSX.Element {
     },
   });
 
+  // Dedup: when signed-in, `roleItems[0]` is "Home" (from useRoleNav). Drop
+  // the duplicate from `PRIMARY_ITEMS` so the drawer doesn't list "Home" twice.
+  // Polish from PR #51 (F-NAV-1) verification — see #49 fix-PR.
+  const primaryItems = isAuthed ? PRIMARY_ITEMS.filter((i) => i.href !== '/') : PRIMARY_ITEMS;
+
   return (
     <Dialog.Root open={isOpen} onOpenChange={setSidebarOpen}>
       <Dialog.Portal>
@@ -135,7 +140,7 @@ export function Sidebar(): JSX.Element {
               </div>
             ) : null}
 
-            <NavList items={PRIMARY_ITEMS} />
+            <NavList items={primaryItems} />
 
             <div className="border-t border-line">
               <p className="px-4 pt-4 text-body-xs font-semibold uppercase tracking-wider text-ink-tertiary">
