@@ -1,4 +1,6 @@
 export { AppLayout } from './app-layout';
+export { DashboardLayout } from './dashboard-layout';
+export { DashboardSidebar } from './dashboard-sidebar';
 export { Header } from './header';
 export { Footer } from './footer';
 export { Sidebar } from './sidebar';

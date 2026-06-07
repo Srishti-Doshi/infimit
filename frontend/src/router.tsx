@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom';
 
 import { RedirectIfAuthed, RequireAuth, RequireRole } from '@/components/auth-guards';
-import { AppLayout } from '@/components/layout';
+import { AppLayout, DashboardLayout } from '@/components/layout';
 import { Spinner } from '@/components/ui';
 
 import ForbiddenPage from '@/pages/forbidden';
@@ -88,46 +88,53 @@ const router = createBrowserRouter(
         { path: 'auth/reset-password', element: <ResetPasswordPage /> },
         { path: 'auth/verify-email', element: <VerifyEmailPage /> },
 
-        // Authenticated routes. Inner RequireRole wrappers enforce role
+        // Authenticated routes. Wrapped in `DashboardLayout` so the
+        // role-aware persistent sidebar (lg+) mounts once for every
+        // dashboard route. Inner `RequireRole` wrappers enforce role
         // hierarchy (admin > editor > author > reader).
         {
           element: <RequireAuth />,
           children: [
-            { path: 'dashboard/me', element: <ProfilePage /> },
-            { path: 'dashboard/notifications', element: <NotificationsPage /> },
-            { path: 'dashboard/reader/*', element: <ReaderDashboardPage /> },
             {
-              element: <RequireRole roles={['author', 'editor', 'admin']} />,
+              element: <DashboardLayout />,
               children: [
-                // `/dashboard/author` redirects to the drafts list by sharing
-                // the same element — both URLs are valid entry points.
-                { path: 'dashboard/author', element: <DraftsPage /> },
-                { path: 'dashboard/author/drafts', element: <DraftsPage /> },
-                // New / edit / submissions screens land Day 5+; placeholders
-                // keep "New draft" + row-click navigations from 404-ing in dev.
-                { path: 'dashboard/author/drafts/new', element: <NewDraftPage /> },
-                { path: 'dashboard/author/drafts/:id', element: <EditDraftPage /> },
-                { path: 'dashboard/author/submissions', element: <SubmissionsPage /> },
-              ],
-            },
-            {
-              element: <RequireRole roles={['editor', 'admin']} />,
-              children: [
-                { path: 'dashboard/editor', element: <EditorDashboardPage /> },
-                { path: 'dashboard/editor/approvals', element: <ApprovalsPage /> },
-                { path: 'dashboard/editor/approvals/:id', element: <ApprovalPreviewPage /> },
-                { path: 'dashboard/editor/comments/pending', element: <PendingCommentsPage /> },
-              ],
-            },
-            {
-              element: <RequireRole roles={['admin']} />,
-              children: [
-                { path: 'dashboard/admin', element: <AdminLandingPage /> },
-                { path: 'dashboard/admin/editors', element: <AdminEditorsPage /> },
-                { path: 'dashboard/admin/organisations', element: <AdminOrganisationsPage /> },
-                { path: 'dashboard/admin/approvals', element: <AdminApprovalsPage /> },
-                { path: 'dashboard/admin/epapers', element: <AdminEpapersPage /> },
-                { path: 'dashboard/admin/epapers/new', element: <NewEpaperPage /> },
+                { path: 'dashboard/me', element: <ProfilePage /> },
+                { path: 'dashboard/notifications', element: <NotificationsPage /> },
+                { path: 'dashboard/reader/*', element: <ReaderDashboardPage /> },
+                {
+                  element: <RequireRole roles={['author', 'editor', 'admin']} />,
+                  children: [
+                    // `/dashboard/author` redirects to the drafts list by sharing
+                    // the same element — both URLs are valid entry points.
+                    { path: 'dashboard/author', element: <DraftsPage /> },
+                    { path: 'dashboard/author/drafts', element: <DraftsPage /> },
+                    // New / edit / submissions screens land Day 5+; placeholders
+                    // keep "New draft" + row-click navigations from 404-ing in dev.
+                    { path: 'dashboard/author/drafts/new', element: <NewDraftPage /> },
+                    { path: 'dashboard/author/drafts/:id', element: <EditDraftPage /> },
+                    { path: 'dashboard/author/submissions', element: <SubmissionsPage /> },
+                  ],
+                },
+                {
+                  element: <RequireRole roles={['editor', 'admin']} />,
+                  children: [
+                    { path: 'dashboard/editor', element: <EditorDashboardPage /> },
+                    { path: 'dashboard/editor/approvals', element: <ApprovalsPage /> },
+                    { path: 'dashboard/editor/approvals/:id', element: <ApprovalPreviewPage /> },
+                    { path: 'dashboard/editor/comments/pending', element: <PendingCommentsPage /> },
+                  ],
+                },
+                {
+                  element: <RequireRole roles={['admin']} />,
+                  children: [
+                    { path: 'dashboard/admin', element: <AdminLandingPage /> },
+                    { path: 'dashboard/admin/editors', element: <AdminEditorsPage /> },
+                    { path: 'dashboard/admin/organisations', element: <AdminOrganisationsPage /> },
+                    { path: 'dashboard/admin/approvals', element: <AdminApprovalsPage /> },
+                    { path: 'dashboard/admin/epapers', element: <AdminEpapersPage /> },
+                    { path: 'dashboard/admin/epapers/new', element: <NewEpaperPage /> },
+                  ],
+                },
               ],
             },
           ],
