@@ -134,6 +134,34 @@ async function reconcileMediaRefs(
   ]);
 }
 
+// ─── view shaping ───────────────────────────────────────────────────────
+
+interface AuthorView {
+  id: string;
+  name: string;
+}
+
+interface ArticleListItemView {
+  [key: string]: unknown;
+  author: AuthorView | null;
+}
+
+/**
+ * Batch-load authors for a set of article authorIds. Returns a Map keyed by
+ * the user id string so callers can attach `author: { id, name }` alongside
+ * the existing `authorId` reference. Includes soft-deleted users — an
+ * article outlives its author account, and the byline should still render
+ * if the author was later deactivated.
+ */
+async function loadAuthorsByIds(
+  authorIds: ReadonlyArray<Types.ObjectId>,
+): Promise<Map<string, AuthorView>> {
+  const unique = dedupeObjectIds(authorIds);
+  if (unique.length === 0) return new Map();
+  const users = await usersRepo.findManyByIds(unique);
+  return new Map(users.map((u) => [u._id.toString(), { id: u._id.toString(), name: u.name }]));
+}
+
 // ─── create draft ───────────────────────────────────────────────────────
 
 export interface CreateDraftInput {
@@ -357,7 +385,7 @@ export interface ListInput {
 }
 
 export async function listArticles(input: ListInput): Promise<{
-  items: ArticleModel[];
+  items: ArticleListItemView[];
   total: number;
   page: number;
   limit: number;
@@ -385,7 +413,13 @@ export async function listArticles(input: ListInput): Promise<{
     limit: input.limit,
   });
 
-  return { items, total, page: input.page ?? 1, limit: input.limit ?? 20 };
+  const authors = await loadAuthorsByIds(items.map((a) => a.authorId));
+  const shaped: ArticleListItemView[] = items.map((a) => ({
+    ...(a.toJSON() as Record<string, unknown>),
+    author: authors.get(a.authorId.toString()) ?? null,
+  }));
+
+  return { items: shaped, total, page: input.page ?? 1, limit: input.limit ?? 20 };
 }
 
 // ─── submit for review ──────────────────────────────────────────────────
@@ -1051,6 +1085,10 @@ export async function getArticleBySlug(slug: string): Promise<PublicArticleView>
     if (!article || article.status !== 'published') {
       throw ApiError.notFound('Article not found');
     }
-    return article.toJSON() as PublicArticleView;
+    const authors = await loadAuthorsByIds([article.authorId]);
+    return {
+      ...(article.toJSON() as Record<string, unknown>),
+      author: authors.get(article.authorId.toString()) ?? null,
+    } as PublicArticleView;
   });
 }

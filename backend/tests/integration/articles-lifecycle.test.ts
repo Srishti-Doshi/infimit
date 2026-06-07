@@ -518,7 +518,7 @@ describe('POST /v1/articles/:id/ai/summary (regenerate)', () => {
 // ─── GET /v1/articles/slug/:slug (public, cached) ───────────────────────
 
 describe('GET /v1/articles/slug/:slug', () => {
-  it('returns a published article without auth', async () => {
+  it('returns a published article without auth, with author populated', async () => {
     const author = await seedUser('author');
     const { slug } = await seedPublishedArticle(author.id);
 
@@ -526,6 +526,7 @@ describe('GET /v1/articles/slug/:slug', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.article.slug).toBe(slug);
     expect(res.body.data.article.status).toBe('published');
+    expect(res.body.data.article.author).toEqual({ id: author.id, name: 'author user' });
   });
 
   it('returns 404 for an unpublished article (even if it exists)', async () => {
