@@ -77,6 +77,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Home', href: '/', icon: Home, end: true },
   { label: 'Admin console', href: '/dashboard/admin', icon: LayoutDashboard, end: true },
   { label: 'Approvals queue', href: '/dashboard/admin/approvals', icon: ClipboardCheck },
+  { label: 'Articles', href: '/dashboard/admin/articles', icon: FileText },
   { label: 'Editors', href: '/dashboard/admin/editors', icon: Users },
   { label: 'Organisations', href: '/dashboard/admin/organisations', icon: Building2 },
   { label: 'E-papers', href: '/dashboard/admin/epapers', icon: Newspaper },
