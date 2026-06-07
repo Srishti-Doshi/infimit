@@ -37,6 +37,18 @@ export async function findById(id: Types.ObjectId | string): Promise<UserModel |
   return User.findById(id).exec();
 }
 
+/**
+ * Batch lookup by ids. Returns matching users including soft-deleted ones,
+ * so callers populating historical references (e.g. article bylines) still
+ * resolve names for authors whose accounts were later deactivated.
+ */
+export async function findManyByIds(
+  ids: ReadonlyArray<Types.ObjectId | string>,
+): Promise<UserModel[]> {
+  if (ids.length === 0) return [];
+  return User.find({ _id: { $in: ids as Array<Types.ObjectId | string> } }).exec();
+}
+
 export interface CreateUserInput {
   email: string;
   passwordHash: string;

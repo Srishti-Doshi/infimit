@@ -327,6 +327,7 @@ describe('GET /v1/articles', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.total).toBe(1);
     expect(res.body.data.items[0].authorId).toBe(a.id);
+    expect(res.body.data.items[0].author).toEqual({ id: a.id, name: 'author user' });
   });
 
   it('editor sees all articles regardless of author', async () => {
