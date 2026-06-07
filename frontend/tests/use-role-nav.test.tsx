@@ -65,7 +65,7 @@ describe('useRoleNav', () => {
     ]);
   });
 
-  it('returns admin nav with Admin console + Editors + Organisations + E-papers when user role is admin', () => {
+  it('returns admin nav with Admin console + Articles + Editors + Organisations + E-papers when user role is admin', () => {
     useAuthStore.setState({ user: makeUser('admin') });
     const { result } = renderHook(() => useRoleNav());
     expect(result.current.roleLabel).toBe('Admin');
@@ -73,6 +73,7 @@ describe('useRoleNav', () => {
       'Home',
       'Admin console',
       'Approvals queue',
+      'Articles',
       'Editors',
       'Organisations',
       'E-papers',
@@ -89,6 +90,7 @@ describe('useRoleNav', () => {
       Home: '/',
       'Admin console': '/dashboard/admin',
       'Approvals queue': '/dashboard/admin/approvals',
+      Articles: '/dashboard/admin/articles',
       Editors: '/dashboard/admin/editors',
       Organisations: '/dashboard/admin/organisations',
       'E-papers': '/dashboard/admin/epapers',
