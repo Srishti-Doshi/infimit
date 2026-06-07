@@ -63,10 +63,7 @@ describe('<LoginPage>', () => {
       <Routes>
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/" element={<div data-testid="home-marker">HOME</div>} />
-        <Route
-          path="/dashboard/me"
-          element={<div data-testid="dashboard-marker">DASHBOARD</div>}
-        />
+        <Route path="/dashboard/me" element={<div data-testid="dashboard-marker">DASHBOARD</div>} />
       </Routes>,
       { initialEntries: ['/auth/login?next=%2Fdashboard%2Fme'] },
     );
