@@ -75,6 +75,16 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     );
   }
 
+  // Surface retryAfterSec as the standard `Retry-After` header on 429s so HTTP
+  // clients (browsers, axios, etc.) can honor it without parsing the body.
+  if (apiErr.statusCode === 429) {
+    const details = apiErr.details as { retryAfterSec?: unknown } | undefined;
+    const retryAfterSec = typeof details?.retryAfterSec === 'number' ? details.retryAfterSec : null;
+    if (retryAfterSec !== null) {
+      res.setHeader('Retry-After', String(retryAfterSec));
+    }
+  }
+
   res.status(apiErr.statusCode).json({
     success: false,
     ...apiErr.toJSON(),

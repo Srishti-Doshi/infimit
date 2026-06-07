@@ -69,3 +69,9 @@ export const paginationQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;
+
+/** Admin role change. */
+export const updateRoleBodySchema = z.object({
+  role: z.enum(['reader', 'author', 'editor', 'admin']),
+});
+export type UpdateRoleBody = z.infer<typeof updateRoleBodySchema>;

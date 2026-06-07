@@ -27,7 +27,7 @@ import {
 import { orgsRepo } from '@/modules/organisations';
 import { usersRepo, type UserModel } from '@/modules/users';
 
-import { blocklistJti, isJtiBlocklisted } from './blocklist';
+import { blocklistJti, consumeJti, isJtiBlocklisted } from './blocklist';
 import { clearFailedLogins, isAccountLocked, recordFailedLogin } from './brute-force';
 import { sendPasswordResetEmail, sendVerifyEmail } from './email';
 import { isSessionActive, revokeAllSessionsForUser, revokeSession } from './repository';
@@ -316,12 +316,19 @@ export async function refreshTokens(refreshToken: string, req?: Request): Promis
 // ─── logout ──────────────────────────────────────────────────────────────
 
 /**
- * Revoke the supplied refresh token (best-effort) and emit an audit log.
+ * Revoke the supplied refresh token AND blocklist the access token whose jti
+ * is on `req.user`. Closes the up-to-15-min window where a parallel tab could
+ * keep using the stolen/shared access token after the user clicked Sign out.
  *
  * Logout is idempotent: an invalid or already-expired cookie just clears the
  * session quietly. The caller (controller) also `res.clearCookie`s.
  */
-export async function logoutUser(refreshToken: string | undefined, userId: string): Promise<void> {
+export async function logoutUser(
+  refreshToken: string | undefined,
+  accessJti: string,
+  accessExp: number,
+  userId: string,
+): Promise<void> {
   if (refreshToken) {
     try {
       const payload = verifyRefreshToken(refreshToken);
@@ -331,6 +338,11 @@ export async function logoutUser(refreshToken: string | undefined, userId: strin
       // Invalid / expired cookie — nothing to revoke. Logout still succeeds.
     }
   }
+
+  // Blocklist the access-token jti too — authGuard checks this on every
+  // subsequent request, so the access token stops working immediately rather
+  // than waiting for its 15-min natural expiry.
+  await blocklistJti(accessJti, new Date(accessExp * 1000));
 
   auditLog({ entity: 'user', entityId: userId, action: 'logout' }, 'auth_logout');
 }
@@ -374,7 +386,11 @@ export async function verifyEmail(token: string): Promise<{ user: UserModel }> {
     throw new ApiError(401, ErrorCode.INVALID_TOKEN, 'Invalid or expired verification token');
   }
 
-  if (await isJtiBlocklisted(payload.jti)) {
+  // Atomic test-and-consume — closes the TOCTOU race where two concurrent
+  // verify-email calls both pass the blocklist check before either commits.
+  // Exactly one caller sees `consumed === true`; the rest get 401.
+  const consumed = await consumeJti(payload.jti, new Date(payload.exp * 1000));
+  if (!consumed) {
     throw new ApiError(
       401,
       ErrorCode.INVALID_TOKEN,
@@ -391,8 +407,6 @@ export async function verifyEmail(token: string): Promise<{ user: UserModel }> {
     user.isEmailVerified = true;
     await user.save();
   }
-
-  await blocklistJti(payload.jti, new Date(payload.exp * 1000));
 
   auditLog(
     { entity: 'user', entityId: user._id.toString(), action: 'email_verified' },
@@ -463,14 +477,17 @@ export async function resetPassword(token: string, newPassword: string): Promise
     throw new ApiError(401, ErrorCode.INVALID_TOKEN, 'Invalid or expired reset token');
   }
 
-  if (await isJtiBlocklisted(payload.jti)) {
-    throw new ApiError(401, ErrorCode.INVALID_TOKEN, 'This reset link has already been used');
-  }
-
   if (!Types.ObjectId.isValid(payload.sub)) {
     throw new ApiError(401, ErrorCode.INVALID_TOKEN, 'Invalid reset token');
   }
   const userObjectId = new Types.ObjectId(payload.sub);
+
+  // Atomic test-and-consume — same race-free pattern as verifyEmail. If the
+  // token was already used (or two callers race), only one wins; the rest 401.
+  const consumed = await consumeJti(payload.jti, new Date(payload.exp * 1000));
+  if (!consumed) {
+    throw new ApiError(401, ErrorCode.INVALID_TOKEN, 'This reset link has already been used');
+  }
 
   const user = await usersRepo.findById(userObjectId);
   if (!user || user.deletedAt !== null) {
@@ -482,9 +499,6 @@ export async function resetPassword(token: string, newPassword: string): Promise
 
   const passwordHash = await hashPassword(newPassword);
   await usersRepo.updateById(userObjectId, { passwordHash });
-
-  // One-shot consumption of the reset token.
-  await blocklistJti(payload.jti, new Date(payload.exp * 1000));
 
   // Sweep all active sessions — anyone holding a refresh token before the
   // password rotation must sign in again.
