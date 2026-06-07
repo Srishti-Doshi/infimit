@@ -8,7 +8,7 @@
  * Subphase 4 surface (editors + admins + the AI pipeline):
  *   - approveArticle      — submitted → approved; fires AI pipeline async
  *   - rejectArticle       — submitted → rejected with a reason
- *   - publishArticle      — approved → published; invalidates slug + feed caches
+ *   - publishArticle      — approved OR unpublished → published; invalidates slug + feed caches
  *   - unpublishArticle    — published → unpublished; invalidates slug + feed caches
  *   - setPlacement        — placement flags on a published article (OCC)
  *   - regenerateSummary   — force re-summarize via aiProxy; invalidate slug cache
@@ -784,13 +784,13 @@ export async function publishArticle(input: PublishArticleInput): Promise<Articl
   }
   const article = await articlesRepo.findById(input.articleId);
   if (!article) throw ApiError.notFound('Article not found');
-  if (article.status !== 'approved') {
-    throw ApiError.invalidState('Only approved articles can be published');
+  if (article.status !== 'approved' && article.status !== 'unpublished') {
+    throw ApiError.invalidState('Only approved or unpublished articles can be published');
   }
 
   const transitioned = await articlesRepo.transition({
     id: article._id,
-    fromStatus: 'approved',
+    fromStatus: article.status,
     toStatus: 'published',
     version: article.version,
     set: { publishedAt: new Date() },
