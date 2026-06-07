@@ -69,6 +69,9 @@ const EDITOR_NAV: NavItem[] = [
   { label: 'Home', href: '/', icon: Home, end: true },
   { label: 'Approvals queue', href: '/dashboard/editor/approvals', icon: ClipboardCheck },
   { label: 'Pending comments', href: '/dashboard/editor/comments/pending', icon: MessageSquare },
+  // Editors can author drafts too (per PR #40 COI fix). "My drafts" gives
+  // them a way back to drafts they create via the Write article CTA (#53).
+  { label: 'My drafts', href: '/dashboard/author/drafts', icon: FileText },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
   { label: 'Profile', href: '/dashboard/me', icon: UserIcon },
 ];
@@ -81,6 +84,8 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Editors', href: '/dashboard/admin/editors', icon: Users },
   { label: 'Organisations', href: '/dashboard/admin/organisations', icon: Building2 },
   { label: 'E-papers', href: '/dashboard/admin/epapers', icon: Newspaper },
+  // Admins can author drafts too. Same rationale as EDITOR_NAV's My drafts.
+  { label: 'My drafts', href: '/dashboard/author/drafts', icon: FileText },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
   { label: 'Profile', href: '/dashboard/me', icon: UserIcon },
 ];
