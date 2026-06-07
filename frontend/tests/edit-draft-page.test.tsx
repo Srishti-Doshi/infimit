@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { server } from '@/mocks/server';
 import { getArticle } from '@/lib/articles-api';
+import { mockDrafts } from '@/mocks/fixtures';
 import EditDraftPage from '@/pages/dashboard/author/drafts/edit';
 import { renderWithProviders } from '@/test/render';
 
@@ -81,5 +82,28 @@ describe('<EditDraftPage>', () => {
       await screen.findByText(/this draft was edited elsewhere/i, undefined, { timeout: 4000 }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /reload draft/i })).toBeInTheDocument();
+  });
+
+  it('shows the rejection banner with reason when article.status is rejected (#49)', async () => {
+    const rejectedDraft = {
+      ...mockDrafts[0]!,
+      status: 'rejected' as const,
+      rejectionReason:
+        'Body is too short on context. Please add 2-3 paragraphs on the methodology before re-submitting.',
+      version: mockDrafts[0]!.version + 1,
+    };
+    server.use(
+      http.get(`${BASE}/articles/:id`, () =>
+        HttpResponse.json({ success: true, data: { article: rejectedDraft } }),
+      ),
+    );
+
+    renderAt('art_draft_001');
+
+    expect(await screen.findByText(/an editor requested revisions/i)).toBeInTheDocument();
+    expect(screen.getByText(/body is too short on context/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/make the requested changes and re-submit when ready/i),
+    ).toBeInTheDocument();
   });
 });
