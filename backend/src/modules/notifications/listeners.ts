@@ -44,7 +44,7 @@ export function registerNotificationListeners(): void {
           type: 'article_approved',
           title: 'Your article was approved',
           body: `An editor approved your ${payload.category.replace(/_/g, ' ')} article. It will go live when published.`,
-          link: `/articles/${payload.articleId}`,
+          link: '/dashboard/author/submissions',
           metadata: {
             articleId: payload.articleId,
             editorId: payload.editorId,
@@ -65,7 +65,7 @@ export function registerNotificationListeners(): void {
           type: 'article_rejected',
           title: 'Your article needs revisions',
           body: payload.rejectionReason,
-          link: `/articles/${payload.articleId}`,
+          link: `/dashboard/author/drafts/${payload.articleId}`,
           metadata: {
             articleId: payload.articleId,
             editorId: payload.editorId,
@@ -89,7 +89,7 @@ export function registerNotificationListeners(): void {
           type: 'article_published',
           title: 'Your article is now live',
           body: `Your ${payload.category.replace(/_/g, ' ')} article was published.`,
-          link: `/articles/slug/${payload.slug}`,
+          link: `/article/${payload.slug}`,
           metadata: {
             articleId: payload.articleId,
             editorId: payload.editorId,
@@ -111,7 +111,7 @@ export function registerNotificationListeners(): void {
           type: 'article_unpublished',
           title: 'Your article was unpublished',
           body: `Your ${payload.category.replace(/_/g, ' ')} article was taken offline by an admin.`,
-          link: `/articles/${payload.articleId}`,
+          link: '/dashboard/author/submissions',
           metadata: {
             articleId: payload.articleId,
             adminId: payload.adminId,
@@ -136,7 +136,7 @@ export function registerNotificationListeners(): void {
           type: 'new_comment',
           title: 'New comment on your article',
           body: `${payload.commenterName} commented on your article.`,
-          link: `/articles/${payload.articleId}#comment-${payload.commentId}`,
+          link: `/article/${payload.slug}#comment-${payload.commentId}`,
           metadata: {
             articleId: payload.articleId,
             commentId: payload.commentId,

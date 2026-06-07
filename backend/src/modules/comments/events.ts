@@ -21,6 +21,8 @@ export interface CommentApprovedPayload {
   articleAuthorId: string;
   commenterId: string;
   commenterName: string;
+  /** Article slug, used to build deep-links to the public reader page. */
+  slug: string;
 }
 
 interface CommentEvents {
