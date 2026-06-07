@@ -166,7 +166,7 @@ describe('notification listeners (event-driven creation)', () => {
       () => Notification.findOne({ userId: author.id, type: 'article_published' }).exec(),
       (n) => n !== null,
     ))!;
-    expect(notif.link).toContain('/articles/slug/some-slug');
+    expect(notif.link).toBe('/article/some-slug');
   });
 
   it('article.unpublished → notifies the author with the slug', async () => {
@@ -198,6 +198,7 @@ describe('notification listeners (event-driven creation)', () => {
       articleAuthorId: author.id,
       commenterId: commenter.id,
       commenterName: 'Reader Renee',
+      slug: 'reader-renee-piece',
     });
 
     const notif = (await waitFor(
@@ -205,6 +206,7 @@ describe('notification listeners (event-driven creation)', () => {
       (n) => n !== null,
     ))!;
     expect(notif.body).toContain('Reader Renee');
+    expect(notif.link).toBe(`/article/reader-renee-piece#comment-${commentId}`);
     expect((notif.metadata as { commentId: string }).commentId).toBe(commentId);
   });
 
@@ -216,6 +218,7 @@ describe('notification listeners (event-driven creation)', () => {
       articleAuthorId: author.id,
       commenterId: author.id, // same person
       commenterName: 'Author Anna',
+      slug: 'self-comment-piece',
     });
     await flushAsync();
 

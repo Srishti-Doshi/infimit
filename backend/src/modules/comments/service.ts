@@ -204,6 +204,7 @@ export async function moderateComment(input: ModerateCommentInput): Promise<Comm
         articleAuthorId: article.authorId.toString(),
         commenterId: updated.userId.toString(),
         commenterName: commenter.name,
+        slug: article.slug,
       });
     }
   }
