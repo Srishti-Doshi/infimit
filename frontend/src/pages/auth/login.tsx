@@ -67,7 +67,14 @@ export default function LoginPage(): JSX.Element {
     <Modal
       open
       onOpenChange={(open) => {
-        if (!open) navigate(next ?? '/', { replace: true });
+        // Dismiss (X / Esc / backdrop) always sends the user home — NOT to
+        // `next`. `next` typically points at a guarded route (the page they
+        // were on when their session expired), and navigating there while
+        // still unauthenticated bounces straight back to `/auth/login?next=…`,
+        // creating a re-render loop where the modal looks like it's
+        // reopening (#29). `next` is still honoured on SUCCESSFUL login
+        // below — the user is authenticated by then and won't bounce.
+        if (!open) navigate('/', { replace: true });
       }}
       size="md"
     >
