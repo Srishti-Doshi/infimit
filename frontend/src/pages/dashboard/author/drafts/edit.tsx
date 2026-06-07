@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, Check, Loader2, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, Loader2, MessageSquare, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -192,6 +192,9 @@ function EditForm({ article }: { article: Article }): JSX.Element {
         <SaveIndicator status={status} lastSavedAt={lastSavedAt} />
       </div>
 
+      {article.status === 'rejected' && article.rejectionReason ? (
+        <RejectionBanner reason={article.rejectionReason} />
+      ) : null}
       {conflict ? <ConflictBanner onReload={reload} /> : null}
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_320px]">
@@ -388,6 +391,38 @@ function ConflictBanner({ onReload }: { onReload: () => void }): JSX.Element {
       >
         Reload draft
       </Button>
+    </div>
+  );
+}
+
+/**
+ * RejectionBanner — surfaces the editor's rejection reason at the top of the
+ * draft edit page when `article.status === 'rejected'`. Closes the gap from
+ * #49 (F-AUTHOR-N) where authors had to context-switch back to
+ * /dashboard/notifications to remember what an editor asked them to fix.
+ *
+ * Visual treatment matches `ConflictBanner` (warning tone, role="alert") —
+ * both communicate "needs your attention before re-submitting". MessageSquare
+ * icon is used (instead of AlertTriangle) to signal "editor feedback" rather
+ * than "system warning".
+ */
+function RejectionBanner({ reason }: { reason: string }): JSX.Element {
+  return (
+    <div
+      role="alert"
+      className="mt-6 flex flex-wrap items-start gap-4 rounded-lg border border-status-warning-text/30 bg-status-warning-bg px-4 py-3"
+    >
+      <MessageSquare
+        className="mt-0.5 h-5 w-5 shrink-0 text-status-warning-text"
+        aria-hidden="true"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-status-warning-text">An editor requested revisions</p>
+        <p className="mt-1 text-body-sm text-status-warning-text/90">&ldquo;{reason}&rdquo;</p>
+        <p className="mt-2 text-body-sm text-status-warning-text/80">
+          Make the requested changes and re-submit when ready.
+        </p>
+      </div>
     </div>
   );
 }
