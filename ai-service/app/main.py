@@ -11,7 +11,8 @@ from app.routers.metrics import router as metrics_router
 
 app = FastAPI()
 
-app.include_router(summarize_router)
+app.include_router(summarize_router,
+                    prefix="/v1")
 # app.add_middleware(AuthMiddleware)
 
 logging.basicConfig(level=logging.INFO)

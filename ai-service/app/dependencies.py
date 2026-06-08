@@ -1,5 +1,6 @@
 from fastapi import Header, HTTPException
 from app.config import settings
+ 
 
 def verify_internal_key(
     x_internal_key: str = Header(...)
@@ -7,7 +8,7 @@ def verify_internal_key(
     print("verify_internal_key called")
     if x_internal_key != settings.AI_INTERNAL_KEY:
         raise HTTPException(
-            status_code=403,
+            status_code=401,
             detail="Unauthorized"
         )
 
