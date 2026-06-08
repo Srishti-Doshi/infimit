@@ -17,12 +17,14 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/**'
+      - 'ai-service/**'
       - '.github/workflows/ci.yml'
   push:
     branches: [main]
     paths:
       - 'backend/**'
       - 'frontend/**'
+      - 'ai-service/**'
       - '.github/workflows/ci.yml'
 
 # Cancel any superseded run for the same PR or branch.
@@ -142,3 +144,42 @@ jobs:
           test -f dist/index.html
           test -d dist/assets
           echo "OK — dist/index.html and dist/assets present."
+
+
+  # ─── AI Service ────────────────────────────────────────────
+  ai-service:
+    name: AI Service checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: ai-service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python (recommended for AI service)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Lint (optional)
+        run: |
+          pip install ruff
+          ruff check .
+
+      - name: Run tests
+        run: |
+          pip install pytest
+          pytest -q
+
+      - name: Basic import check
+        run: |
+          python -c "import main; print('AI service imports OK')"

@@ -8,15 +8,14 @@ import hashlib
 logger = logging.getLogger(__name__)
 
 def summarize_text(text: str):
-    
-    
     try:
         # 1. CREATE CACHE KEY (FIRST LINE)
         cache_key = "summarize:" + hashlib.md5(text.encode()).hexdigest()
 
         # 2. CHECK CACHE
         cached_result = get_cache(cache_key)
-        if cached_result:
+
+        if isinstance(cached_result, str) and cached_result.strip():
             return cached_result
 
         # 3. LOAD CLIENT
@@ -51,6 +50,8 @@ Rules:
 Your task is to create accurate, professional, and publication-ready summaries of education-related news articles.
 
 Guidelines:
+ 
+article must be at least 600 words and maximum 800 words.
 
 Preserve all important facts, figures, dates, names, and announcements.
 Never add information that is not present in the original article.
@@ -74,10 +75,7 @@ Allow paragraph length to vary naturally according to the content.
 
 Summary Length Rules:
 
-Articles under 250 words: Create a concise summary while preserving all important information.
-Articles between 250 and 1500 words: Create a balanced summary covering all major points.
-Articles above 1500 words: Create a detailed summary that captures the key developments and outcomes.
-Prioritize information preservation over aggressive compression.
+
 
 Output only the summary.
  
@@ -120,11 +118,10 @@ Polish article
         
         set_cache(cache_key, result, ttl=3600)
 
-        return result
+        return result   
 
     except Exception as e:
-          logger.exception(f"AI Service Error: {e}")
-          return "Unable to generate summary right now. Please try again later."
-
+        logger.exception(e)
+        raise Exception(str(e))
 
 
