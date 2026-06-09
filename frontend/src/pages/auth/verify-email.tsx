@@ -1,5 +1,5 @@
 import { CheckCircle2, XCircle } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { Logo } from '@/components/layout/logo';
@@ -12,15 +12,24 @@ type Status = 'pending' | 'success' | 'error';
  * Email-verify landing. Reads `?token=` from the URL, posts it once on mount,
  * and surfaces a pending/success/error state. No form — the link itself is the
  * action.
+ *
+ * Single-fire guard (#22): React 18 StrictMode runs effects twice in dev. The
+ * backend's `consumeJti` (PR #61) is atomic via Redis SET NX, so the second
+ * POST would correctly get 401 INVALID_TOKEN — but the FE would then race the
+ * success and error `setStatus` calls and end up showing "Verification failed"
+ * on a token that just verified successfully. The ref guard fires the consume
+ * exactly once per token-value, regardless of how many times the effect runs.
  */
 export default function VerifyEmailPage(): JSX.Element {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const token = params.get('token');
   const [status, setStatus] = useState<Status>(token ? 'pending' : 'error');
+  const firedFor = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || firedFor.current === token) return;
+    firedFor.current = token;
     void (async () => {
       try {
         await verifyEmail(token);
