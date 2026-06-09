@@ -49,6 +49,7 @@ export default function EditDraftPage(): JSX.Element {
 
 interface EditFormValues {
   title: string;
+  subtitle: string;
   category: ArticleCategory;
   tags: string[];
 }
@@ -68,6 +69,7 @@ function EditForm({ article }: { article: Article }): JSX.Element {
   const { register, control, watch } = useForm<EditFormValues>({
     defaultValues: {
       title: article.title,
+      subtitle: article.subtitle ?? '',
       category: article.category,
       tags: article.tags ?? [],
     },
@@ -95,6 +97,9 @@ function EditForm({ article }: { article: Article }): JSX.Element {
       try {
         const updated = await updateDraft(article.id, {
           title: formValues.title,
+          // Send `undefined` not `""` when empty so the BE doesn't persist a
+          // literal empty subtitle (clears the field cleanly on the model).
+          subtitle: formValues.subtitle?.trim() ? formValues.subtitle.trim() : undefined,
           category: formValues.category,
           tags: formValues.tags,
           body: body || undefined,
@@ -154,6 +159,7 @@ function EditForm({ article }: { article: Article }): JSX.Element {
     mutationFn: () =>
       updateDraft(article.id, {
         title: formValues.title,
+        subtitle: formValues.subtitle?.trim() ? formValues.subtitle.trim() : undefined,
         category: formValues.category,
         tags: formValues.tags,
         body: body || undefined,
@@ -207,6 +213,15 @@ function EditForm({ article }: { article: Article }): JSX.Element {
                 autoComplete="off"
                 maxLength={200}
                 {...register('title')}
+              />
+
+              <Input
+                label="Subtitle"
+                placeholder="Optional one-line summary that sits below the title"
+                autoComplete="off"
+                maxLength={500}
+                helperText="Up to 500 characters. Often the first hook readers see in feeds."
+                {...register('subtitle')}
               />
 
               <Controller
