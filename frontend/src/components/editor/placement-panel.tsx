@@ -202,15 +202,9 @@ function PlacementPanelInner({ article }: PlacementPanelProps): JSX.Element {
                 onChange={(e) =>
                   setLocal((prev) => ({ ...prev, priority: Number(e.target.value) }))
                 }
-                onMouseUp={(e) =>
-                  update('priority', Number((e.target as HTMLInputElement).value))
-                }
-                onTouchEnd={(e) =>
-                  update('priority', Number((e.target as HTMLInputElement).value))
-                }
-                onKeyUp={(e) =>
-                  update('priority', Number((e.target as HTMLInputElement).value))
-                }
+                onMouseUp={(e) => update('priority', Number((e.target as HTMLInputElement).value))}
+                onTouchEnd={(e) => update('priority', Number((e.target as HTMLInputElement).value))}
+                onKeyUp={(e) => update('priority', Number((e.target as HTMLInputElement).value))}
                 className="mt-2 w-full accent-brand-red-500"
               />
               <p className="mt-1 text-body-xs text-ink-tertiary">
