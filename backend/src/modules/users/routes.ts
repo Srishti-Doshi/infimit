@@ -27,6 +27,7 @@ import {
   getMeHandler,
   listAuthorsHandler,
   listEditorsHandler,
+  lookupUserByEmailHandler,
   removeEditorHandler,
   updateMeHandler,
   updateUserRoleHandler,
@@ -34,6 +35,7 @@ import {
 } from './controller';
 import {
   createEditorBodySchema,
+  lookupQuerySchema,
   objectIdParamSchema,
   paginationQuerySchema,
   slugParamSchema,
@@ -75,9 +77,24 @@ router.delete(
   removeEditorHandler,
 );
 
+// ─── admin: lookup user by email ─────────────────────────────────────────
+// Literal-prefix route — MUST come before `/:id/role` below or that param
+// route would otherwise capture "lookup" as an id (the validator would
+// reject it as non-ObjectId-shaped, but the precedence is clearer this way).
+// Used by the Authors-management UI (#33): admin types an email → service
+// returns the user's id+role → admin then PATCHes `/:id/role`.
+router.get(
+  '/lookup',
+  requireAuth,
+  requireRole('admin'),
+  validate({ query: lookupQuerySchema }),
+  lookupUserByEmailHandler,
+);
+
 // ─── admin: any-user role change ─────────────────────────────────────────
 // Belongs at the bottom so the literal-prefix routes above (`/me`, `/authors`,
-// `/editors`) match first; `/:id/role` would otherwise capture them as ids.
+// `/editors`, `/lookup`) match first; `/:id/role` would otherwise capture
+// them as ids.
 router.patch(
   '/:id/role',
   requireAuth,

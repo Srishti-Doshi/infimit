@@ -259,6 +259,26 @@ export const handlers = [
     mockEditorsList = mockEditorsList.filter((e) => e.id !== params.id);
     return new HttpResponse(null, { status: 204 });
   }),
+
+  // Authors list — public-readable per BE. Empty by default; per-test
+  // overrides supply fixtures via `server.use(...)`.
+  http.get(`${BASE}/users/authors`, () => ok({ total: 0, items: [], page: 1, limit: 20 })),
+
+  // Admin lookup-by-email — returns 404 unless a per-test override matches.
+  http.get(`${BASE}/users/lookup`, ({ request }) => {
+    if (!hasBearer(request)) return err('UNAUTHORIZED', 'Not signed in', 401);
+    const url = new URL(request.url);
+    const email = url.searchParams.get('email');
+    return err('NOT_FOUND', `No active user matches ${email ?? '(empty)'}`, 404);
+  }),
+
+  // Admin role change — echoes back the patched role on the mock user.
+  http.patch(`${BASE}/users/:id/role`, async ({ request, params }) => {
+    if (!hasBearer(request)) return err('UNAUTHORIZED', 'Not signed in', 401);
+    const body = (await request.json()) as { role: 'reader' | 'author' | 'editor' | 'admin' };
+    return ok({ user: { ...mockUser, id: String(params.id), role: body.role } });
+  }),
+
   http.get(`${BASE}/users/:id`, ({ params }) => ok({ ...mockUser, id: String(params.id) })),
 
   // ── Organisations ──────────────────────────────────────────────────────
