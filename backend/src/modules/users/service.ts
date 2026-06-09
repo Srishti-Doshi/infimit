@@ -215,6 +215,28 @@ export async function removeEditor(adminId: string, targetId: string): Promise<v
   );
 }
 
+// ─── admin: lookup by email ──────────────────────────────────────────────
+
+/**
+ * Find a user by email. Soft-deleted accounts are excluded (the partial
+ * unique index on `email` only covers active rows, so a deleted account
+ * shouldn't be addressable here either). Used by the Authors-management UI
+ * (#33): admin types in an email → service returns id+role → admin chooses
+ * the next role and hits `PATCH /:id/role`. Composes with the existing
+ * mutation surface instead of bundling email+role into one endpoint.
+ *
+ * Not a privacy concern: admin already has full visibility into the user
+ * collection via list endpoints, so revealing existence-by-email to them
+ * doesn't widen the threat model.
+ */
+export async function lookupByEmail(email: string): Promise<UserModel> {
+  const user = await usersRepo.findActiveByEmail(email);
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+  return user;
+}
+
 // ─── admin: change role ──────────────────────────────────────────────────
 
 /**

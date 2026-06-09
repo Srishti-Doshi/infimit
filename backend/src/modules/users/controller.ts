@@ -17,11 +17,18 @@ import {
   getMe,
   listAuthors,
   listEditors,
+  lookupByEmail,
   removeEditor,
   updateMe,
   updateUserRole,
 } from './service';
-import type { CreateEditorBody, PaginationQuery, UpdateMeBody, UpdateRoleBody } from './validator';
+import type {
+  CreateEditorBody,
+  LookupQuery,
+  PaginationQuery,
+  UpdateMeBody,
+  UpdateRoleBody,
+} from './validator';
 
 export const getMeHandler = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
@@ -115,6 +122,15 @@ export const removeEditorHandler = asyncHandler(async (req: Request, res: Respon
   const { id } = req.params as { id: string };
   await removeEditor(req.user.id, id);
   res.status(204).send();
+});
+
+export const lookupUserByEmailHandler = asyncHandler(async (req: Request, res: Response) => {
+  const query = req.query as LookupQuery;
+  const user = await lookupByEmail(query.email);
+  res.status(200).json({
+    success: true,
+    data: { user: user.toJSON() },
+  });
 });
 
 export const updateUserRoleHandler = asyncHandler(async (req: Request, res: Response) => {

@@ -276,6 +276,54 @@ describe('PATCH /v1/users/:id/role', () => {
   });
 });
 
+describe('GET /v1/users/lookup', () => {
+  it('admin looks up a reader by email and gets back the user envelope', async () => {
+    const admin = await seedUser('admin');
+    const reader = await seedUser('reader', { email: 'lookup-target@test.dev' });
+
+    const res = await request(app)
+      .get('/v1/users/lookup?email=lookup-target@test.dev')
+      .set('Authorization', `Bearer ${admin.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.id).toBe(reader.id);
+    expect(res.body.data.user.email).toBe('lookup-target@test.dev');
+    expect(res.body.data.user.role).toBe('reader');
+    expect(res.body.data.user.passwordHash).toBeUndefined();
+  });
+
+  it('non-admin (editor) gets 403', async () => {
+    const editor = await seedUser('editor');
+    await seedUser('reader', { email: 'lookup-target@test.dev' });
+
+    const res = await request(app)
+      .get('/v1/users/lookup?email=lookup-target@test.dev')
+      .set('Authorization', `Bearer ${editor.token}`);
+
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 404 when no active user matches that email', async () => {
+    const admin = await seedUser('admin');
+
+    const res = await request(app)
+      .get('/v1/users/lookup?email=nobody@test.dev')
+      .set('Authorization', `Bearer ${admin.token}`);
+
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects an invalid email format with 422', async () => {
+    const admin = await seedUser('admin');
+
+    const res = await request(app)
+      .get('/v1/users/lookup?email=not-an-email')
+      .set('Authorization', `Bearer ${admin.token}`);
+
+    expect(res.status).toBe(422);
+  });
+});
+
 describe('GET /v1/users/authors/:slug', () => {
   it('returns 404 for a deleted author', async () => {
     const admin = await seedUser('admin');

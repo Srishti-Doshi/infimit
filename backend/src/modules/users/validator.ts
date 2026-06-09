@@ -75,3 +75,14 @@ export const updateRoleBodySchema = z.object({
   role: z.enum(['reader', 'author', 'editor', 'admin']),
 });
 export type UpdateRoleBody = z.infer<typeof updateRoleBodySchema>;
+
+/**
+ * Admin lookup-by-email query — used to find a user id by email when the
+ * admin only knows the email (e.g. promoting an existing reader to author
+ * from the Authors-management UI). Soft-deleted accounts return 404 to
+ * avoid leaking deletion state.
+ */
+export const lookupQuerySchema = z.object({
+  email: emailSchema,
+});
+export type LookupQuery = z.infer<typeof lookupQuerySchema>;
