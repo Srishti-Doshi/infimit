@@ -5,6 +5,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Logo } from '@/components/layout/logo';
 import { Modal, ModalBody, ModalDescription, ModalTitle, Spinner } from '@/components/ui';
 import { verifyEmail } from '@/lib/auth-api';
+import { roleLanding } from '@/lib/role-landing';
+import { useAuthStore } from '@/store/auth-store';
 
 type Status = 'pending' | 'success' | 'error';
 
@@ -26,6 +28,14 @@ export default function VerifyEmailPage(): JSX.Element {
   const token = params.get('token');
   const [status, setStatus] = useState<Status>(token ? 'pending' : 'error');
   const firedFor = useRef<string | null>(null);
+
+  // #25: the post-success CTA used to always say "Sign in", but if the
+  // visitor is already authenticated (registration auto-issues tokens and
+  // the bootstrap rehydrates them) signing in again is pointless. Branch
+  // the CTA on `user`: signed-in users get a "Continue to dashboard" link
+  // routed to their role-aware landing; signed-out users get the existing
+  // "Sign in" link.
+  const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
     if (!token || firedFor.current === token) return;
@@ -62,12 +72,21 @@ export default function VerifyEmailPage(): JSX.Element {
               <ModalTitle className="mt-4">Email verified</ModalTitle>
               <ModalDescription className="mt-2">
                 You&rsquo;re all set.{' '}
-                <Link
-                  to="/auth/login"
-                  className="font-medium text-brand-red-500 underline-offset-4 hover:underline"
-                >
-                  Sign in
-                </Link>
+                {user ? (
+                  <Link
+                    to={roleLanding(user.role)}
+                    className="font-medium text-brand-red-500 underline-offset-4 hover:underline"
+                  >
+                    Continue to dashboard
+                  </Link>
+                ) : (
+                  <Link
+                    to="/auth/login"
+                    className="font-medium text-brand-red-500 underline-offset-4 hover:underline"
+                  >
+                    Sign in
+                  </Link>
+                )}
               </ModalDescription>
             </>
           )}
