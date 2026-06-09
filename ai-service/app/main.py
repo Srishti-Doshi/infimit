@@ -11,7 +11,7 @@ from app.routers.metrics import router as metrics_router
 
 app = FastAPI()
 
-# ✅ CORS Middleware (ADD THIS BEFORE ROUTERS)
+ 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -38,8 +38,7 @@ app.include_router(
     tags=["Metrics"]
 )
 
-# Middleware (optional)
-# app.add_middleware(AuthMiddleware)
+ 
 
 # Logging
 logging.basicConfig(level=logging.INFO)
