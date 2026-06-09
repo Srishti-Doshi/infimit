@@ -59,7 +59,11 @@ export function TiptapEditor({
 }: TiptapEditorProps): JSX.Element {
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      // StarterKit bundles a default Link extension — we disable it here so
+      // our explicitly-configured one below doesn't collide (#39). Without
+      // this, every composer mount logs `[tiptap warn]: Duplicate extension
+      // names found: ['link']`.
+      StarterKit.configure({ link: false }),
       Placeholder.configure({ placeholder }),
       // Links open in a new tab + are not click-activatable inside the editor
       // (otherwise clicking a link in edit-mode opens it instead of letting you
