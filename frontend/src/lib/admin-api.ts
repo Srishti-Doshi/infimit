@@ -1,12 +1,14 @@
 import { apiClient } from './api-client';
 import type {
+  CreateAuthorInput,
   CreateEditorInput,
   CreateOrganisationInput,
   UpdateOrganisationInput,
 } from './admin-schema';
 import type { ApiSuccess } from '@/types/api';
+import type { AuthPayload, User } from '@/types/auth';
 import type { Organisation } from '@/types/organisation';
-import type { User } from '@/types/auth';
+import type { Role } from '@/types/auth';
 
 /**
  * Admin resource clients. Lists wrap in `{ total, items }`, singles in
@@ -40,6 +42,52 @@ export async function createEditor(body: CreateEditorInput): Promise<ListedEdito
 
 export async function deleteEditor(id: string): Promise<void> {
   await apiClient.delete(`/users/editors/${id}`);
+}
+
+// ── Authors ───────────────────────────────────────────────────────────────
+
+export interface ListedAuthor extends User {
+  isActive?: boolean;
+}
+
+interface AuthorList {
+  total: number;
+  items: ListedAuthor[];
+}
+
+export async function listAuthors(): Promise<AuthorList> {
+  const res = await apiClient.get<ApiSuccess<AuthorList>>('/users/authors');
+  return res.data.data;
+}
+
+/**
+ * Admin creates an author by hitting the public `/auth/register` with
+ * `role: 'author'` + an `organisationSlug`. The BE accepts this shape;
+ * Subphase 2's public form is intentionally reader-only, so this is the
+ * primary path for new author accounts (#33).
+ */
+export async function createAuthor(body: CreateAuthorInput): Promise<ListedAuthor> {
+  const res = await apiClient.post<ApiSuccess<AuthPayload>>('/auth/register', {
+    role: 'author',
+    ...body,
+  });
+  return res.data.data.user as ListedAuthor;
+}
+
+// ── Role management ───────────────────────────────────────────────────────
+
+/** `GET /v1/users/lookup?email=` — admin-only, returns the user or throws 404. */
+export async function lookupUserByEmail(email: string): Promise<User> {
+  const res = await apiClient.get<ApiSuccess<{ user: User }>>('/users/lookup', {
+    params: { email },
+  });
+  return res.data.data.user;
+}
+
+/** `PATCH /v1/users/:id/role` — admin-only role change. */
+export async function updateUserRole(id: string, role: Role): Promise<User> {
+  const res = await apiClient.patch<ApiSuccess<{ user: User }>>(`/users/${id}/role`, { role });
+  return res.data.data.user;
 }
 
 // ── Organisations ─────────────────────────────────────────────────────────

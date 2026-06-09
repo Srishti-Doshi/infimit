@@ -1,4 +1,4 @@
-import { Building2, UsersRound } from 'lucide-react';
+import { Building2, ShieldCheck, UsersRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Card, CardBody, Container } from '@/components/ui';
@@ -14,6 +14,12 @@ export default function AdminLandingPage(): JSX.Element {
       icon: <UsersRound className="h-6 w-6" aria-hidden="true" />,
       title: 'Editors',
       description: 'Invite editors and remove ones who have moved on.',
+    },
+    {
+      to: '/dashboard/admin/authors',
+      icon: <ShieldCheck className="h-6 w-6" aria-hidden="true" />,
+      title: 'Authors',
+      description: 'Create new authors and change any user’s role.',
     },
     {
       to: '/dashboard/admin/organisations',

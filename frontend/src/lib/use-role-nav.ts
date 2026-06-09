@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Newspaper,
   Send,
+  ShieldCheck,
   User as UserIcon,
   Users,
 } from 'lucide-react';
@@ -81,6 +82,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Admin console', href: '/dashboard/admin', icon: LayoutDashboard, end: true },
   { label: 'Approvals queue', href: '/dashboard/admin/approvals', icon: ClipboardCheck },
   { label: 'Articles', href: '/dashboard/admin/articles', icon: FileText },
+  { label: 'Authors', href: '/dashboard/admin/authors', icon: ShieldCheck },
   { label: 'Editors', href: '/dashboard/admin/editors', icon: Users },
   { label: 'Organisations', href: '/dashboard/admin/organisations', icon: Building2 },
   { label: 'E-papers', href: '/dashboard/admin/epapers', icon: Newspaper },

@@ -70,3 +70,28 @@ export const updateOrganisationSchema = z.object({
   verified: z.boolean().optional(),
 });
 export type UpdateOrganisationInput = z.infer<typeof updateOrganisationSchema>;
+
+/**
+ * Admin creates an author. Submits to `POST /v1/auth/register` with
+ * `role: 'author'`. Org slug is required by the backend — admin can copy it
+ * from `/dashboard/admin/organisations`.
+ */
+export const createAuthorSchema = z.object({
+  name: nameSchema,
+  email: emailSchema,
+  password: passwordSchema,
+  organisationSlug: slugSchema,
+});
+export type CreateAuthorInput = z.infer<typeof createAuthorSchema>;
+
+/** Lookup an existing user by email (admin role-management). */
+export const lookupByEmailSchema = z.object({
+  email: emailSchema,
+});
+export type LookupByEmailInput = z.infer<typeof lookupByEmailSchema>;
+
+/** Admin changes any user's role via `PATCH /v1/users/:id/role`. */
+export const updateUserRoleSchema = z.object({
+  role: z.enum(['reader', 'author', 'editor', 'admin']),
+});
+export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>;
