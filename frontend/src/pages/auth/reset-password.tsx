@@ -1,20 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { Eye, EyeOff, Lock, XCircle } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, Lock, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { Logo } from '@/components/layout/logo';
-import {
-  Button,
-  Input,
-  Modal,
-  ModalBody,
-  ModalDescription,
-  ModalTitle,
-  toast,
-} from '@/components/ui';
+import { Button, Input, Modal, ModalBody, ModalDescription, ModalTitle } from '@/components/ui';
 import { resetPassword } from '@/lib/auth-api';
 import { resetPasswordSchema, type ResetPasswordInput } from '@/lib/auth-schema';
 import { toastError } from '@/lib/error-messages';
@@ -22,14 +14,18 @@ import type { ApiError } from '@/types/api';
 
 /**
  * Reset-password modal. `token` comes from the URL (`?token=…`); the form only
- * collects the new password + confirmation. On success we redirect to login —
- * the backend revokes all sessions on password change, so the user must sign in.
+ * collects the new password + confirmation. On success we render an
+ * interstitial success state with an explicit "Sign in" CTA — earlier
+ * versions toast-and-redirected, but the toast disappeared too fast against
+ * the immediate navigate and QA flagged the silent UX (#24). Backend
+ * revokes all sessions on password change, so the user must sign in regardless.
  */
 export default function ResetPasswordPage(): JSX.Element {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const token = params.get('token');
   const [showPassword, setShowPassword] = useState(false);
+  const [resetSucceeded, setResetSucceeded] = useState(false);
 
   const {
     register,
@@ -43,8 +39,7 @@ export default function ResetPasswordPage(): JSX.Element {
   const { mutate, isPending } = useMutation({
     mutationFn: resetPassword,
     onSuccess: () => {
-      toast.success('Password updated. Please sign in with your new password.');
-      navigate('/auth/login', { replace: true });
+      setResetSucceeded(true);
     },
     onError: (error: ApiError['error']) => toastError(error),
   });
@@ -69,6 +64,25 @@ export default function ResetPasswordPage(): JSX.Element {
             >
               Request a new link
             </Link>
+          </>
+        ) : resetSucceeded ? (
+          <>
+            <CheckCircle2
+              className="mx-auto mt-6 h-10 w-10 text-status-success-text"
+              aria-hidden="true"
+            />
+            <ModalTitle className="mt-4 text-center">Password updated</ModalTitle>
+            <ModalDescription className="mt-2 text-center">
+              All previous sessions were signed out for safety. Sign in with your new password to
+              continue.
+            </ModalDescription>
+            <div className="mt-6 flex justify-center">
+              <Link to="/auth/login">
+                <Button variant="secondary" size="lg">
+                  Sign in
+                </Button>
+              </Link>
+            </div>
           </>
         ) : (
           <>
