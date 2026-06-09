@@ -406,11 +406,7 @@ function ChangeRoleModal({ target, onClose, onDone }: ChangeRoleProps): JSX.Elem
   });
 
   return (
-    <Modal
-      open={target !== null}
-      onOpenChange={(o) => !o && onClose()}
-      size="sm"
-    >
+    <Modal open={target !== null} onOpenChange={(o) => !o && onClose()} size="sm">
       <ModalBody className="px-6 py-7 sm:px-8">
         <ModalTitle>Change role</ModalTitle>
         <ModalDescription className="mt-2">
@@ -424,8 +420,8 @@ function ChangeRoleModal({ target, onClose, onDone }: ChangeRoleProps): JSX.Elem
         </ModalDescription>
 
         <p className="mt-3 text-body-xs text-ink-tertiary">
-          Role changes are eventually consistent: the user&rsquo;s active session still carries
-          the old role until they sign in again (or up to 15 min via natural token rotation).
+          Role changes are eventually consistent: the user&rsquo;s active session still carries the
+          old role until they sign in again (or up to 15 min via natural token rotation).
         </p>
 
         <div className="mt-6 flex flex-col gap-2">

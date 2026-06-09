@@ -62,7 +62,9 @@ describe('<AdminAuthorsPage>', () => {
           success: true,
           data: {
             total: registerHit ? 1 : 0,
-            items: registerHit ? [authorFixture({ name: 'New Author', email: 'new@infimit.dev' })] : [],
+            items: registerHit
+              ? [authorFixture({ name: 'New Author', email: 'new@infimit.dev' })]
+              : [],
             page: 1,
             limit: 20,
           },
