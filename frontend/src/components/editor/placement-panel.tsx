@@ -179,6 +179,18 @@ function PlacementPanelInner({ article }: PlacementPanelProps): JSX.Element {
                 <span>Priority</span>
                 <span className="text-body-xs text-ink-tertiary">{local.priority} / 100</span>
               </label>
+              {/*
+               * Slider commit semantics (#47): `onChange` only updates local
+               * visual state — the thumb tracks the cursor 1:1 without
+               * firing a network call on every step. The PATCH is queued by
+               * `update()` on RELEASE only (mouse-up / touch-end / key-up),
+               * which then runs through the existing 500 ms debounce so a
+               * follow-up toggle still batches into the same request.
+               *
+               * Pre-fix, a slow drag with natural pauses ≥500 ms fired one
+               * PATCH per pause — observed as ~4 requests for a single 0→6
+               * drag in QA.
+               */}
               <input
                 id="placement-priority"
                 type="range"
@@ -187,7 +199,12 @@ function PlacementPanelInner({ article }: PlacementPanelProps): JSX.Element {
                 step={1}
                 value={local.priority}
                 disabled={mutation.isPending}
-                onChange={(e) => update('priority', Number(e.target.value))}
+                onChange={(e) =>
+                  setLocal((prev) => ({ ...prev, priority: Number(e.target.value) }))
+                }
+                onMouseUp={(e) => update('priority', Number((e.target as HTMLInputElement).value))}
+                onTouchEnd={(e) => update('priority', Number((e.target as HTMLInputElement).value))}
+                onKeyUp={(e) => update('priority', Number((e.target as HTMLInputElement).value))}
                 className="mt-2 w-full accent-brand-red-500"
               />
               <p className="mt-1 text-body-xs text-ink-tertiary">

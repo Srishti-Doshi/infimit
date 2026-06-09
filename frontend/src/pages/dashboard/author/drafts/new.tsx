@@ -38,6 +38,7 @@ export default function NewDraftPage(): JSX.Element {
     resolver: zodResolver(createDraftSchema),
     defaultValues: {
       title: '',
+      subtitle: '',
       category: 'campus_news',
       tags: [],
       location: '',
@@ -56,6 +57,10 @@ export default function NewDraftPage(): JSX.Element {
   function onSubmit(values: CreateDraftInput): void {
     createMutation.mutate({
       ...values,
+      // Schema accepts subtitle as optional; collapse the empty-string default
+      // back to undefined so the BE doesn't store a literal "" (and so the
+      // empty-state placeholder keeps working on later edits).
+      subtitle: values.subtitle?.trim() ? values.subtitle.trim() : undefined,
       body: body || undefined,
       plainText: plainText || undefined,
       coverImageMediaId: cover?.id ?? null,
@@ -87,6 +92,15 @@ export default function NewDraftPage(): JSX.Element {
               autoComplete="off"
               errorText={errors.title?.message}
               {...register('title')}
+            />
+
+            <Input
+              label="Subtitle"
+              placeholder="Optional one-line summary that sits below the title"
+              autoComplete="off"
+              helperText="Up to 500 characters. Often the first hook readers see in feeds."
+              errorText={errors.subtitle?.message}
+              {...register('subtitle')}
             />
 
             <Controller

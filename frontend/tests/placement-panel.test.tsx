@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
@@ -118,6 +118,66 @@ describe('<PlacementPanel>', () => {
         featured: true,
         trending: true,
       }),
+    });
+  });
+
+  // #47: Drag fires NO PATCH; release fires ONE.
+  // Pre-fix the slider PATCH'd on every `onChange`, which collapsed via the
+  // 500 ms debounce only if the user kept dragging — any pause >500 ms during
+  // a slow drag produced a separate request. The fix splits `onChange`
+  // (visual only) from `onMouseUp` / `onTouchEnd` / `onKeyUp` (commit).
+  it('PATCHes only on slider release, not on every drag step (#47)', async () => {
+    const user = userEvent.setup();
+    const article = makePublishedArticle();
+
+    const patchSpy = vi.fn();
+    server.use(
+      http.patch(`${BASE}/articles/:id/placement`, async ({ request, params }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        patchSpy({ id: params.id, body });
+        return HttpResponse.json({
+          success: true,
+          data: {
+            article: {
+              ...article,
+              placement: {
+                ...article.placement,
+                ...(body as Partial<typeof article.placement>),
+              },
+              version: article.version + 1,
+            },
+          },
+        });
+      }),
+    );
+
+    renderWithProviders(<PlacementPanel article={article} />);
+    await user.click(screen.getByRole('button', { expanded: false }));
+
+    const slider = screen.getByLabelText(/priority/i) as HTMLInputElement;
+
+    // Simulate a drag across multiple values WITHOUT releasing — `change`
+    // events are the React equivalent of native `input` events for a range
+    // input. The fix should hold ZERO PATCHes during this phase.
+    fireEvent.change(slider, { target: { value: '10' } });
+    fireEvent.change(slider, { target: { value: '25' } });
+    fireEvent.change(slider, { target: { value: '40' } });
+
+    // Wait past the previous debounce window — if the fix were broken, a
+    // PATCH would have fired by now.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(patchSpy).not.toHaveBeenCalled();
+    // Visual value tracked the cursor though — that's the contract.
+    expect(slider.value).toBe('40');
+
+    // Release. After the 500 ms debounce, exactly one PATCH should fire
+    // carrying the FINAL drag value (40), not any of the intermediate ones.
+    fireEvent.mouseUp(slider);
+
+    await waitFor(() => expect(patchSpy).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    expect(patchSpy).toHaveBeenCalledWith({
+      id: article.id,
+      body: expect.objectContaining({ priority: 40, version: article.version }),
     });
   });
 
