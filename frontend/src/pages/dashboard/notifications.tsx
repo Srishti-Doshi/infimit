@@ -9,6 +9,7 @@ import {
   markNotificationRead,
 } from '@/lib/notifications-api';
 import { toastError } from '@/lib/error-messages';
+import { useAuthStore } from '@/store/auth-store';
 import type { ApiError } from '@/types/api';
 import type { Notification, NotificationType } from '@/types/notification';
 
@@ -25,10 +26,18 @@ import type { Notification, NotificationType } from '@/types/notification';
  */
 export default function NotificationsPage(): JSX.Element {
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
 
+  // Defence in depth: `RequireAuth` guards the route, but its redirect is
+  // async — there's a tiny window where this page mounts before the
+  // redirect kicks in (e.g. session clear during the page's own render
+  // cycle). Gating on `user` ensures we never fire the auth-required
+  // request while logged out, which would otherwise produce a wasted 401
+  // and noise in the BE log (#21).
   const { data, isLoading } = useQuery({
     queryKey: ['notifications', 'list'],
     queryFn: () => listNotifications(),
+    enabled: Boolean(user),
   });
 
   const items = data?.items ?? [];

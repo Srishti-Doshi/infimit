@@ -118,7 +118,7 @@ function toApiError(error: AxiosError<ApiError>): ApiError['error'] {
 /**
  * Response interceptor.
  *
- * 401 vs 403 — these are DIFFERENT signals and must NEVER be conflated:
+ * 401 vs 403 vs 429 — these are DIFFERENT signals and must NEVER be conflated:
  *
  *   - **401 UNAUTHORIZED** = "your token is invalid or expired". Refresh the
  *     access token (once, for refreshable requests) and replay. If refresh
@@ -132,6 +132,16 @@ function toApiError(error: AxiosError<ApiError>): ApiError['error'] {
  *     include 403 and bounced users to /auth/login on legitimate role
  *     denials; that bug was fixed and this comment exists to prevent
  *     regression.
+ *
+ *   - **429 RATE_LIMITED** = "you're hitting this endpoint too fast". Surface
+ *     the error with `Retry-After` (parsed below into `details.retryAfter` for
+ *     toast countdowns). **Do NOT clear the session** — the user is still
+ *     signed in, they just need to slow down. Pinned by a regression test in
+ *     `auth-refresh.test.ts` (#20).
+ *
+ * Only the 401 branch below has session-clear side effects. Any new status
+ * code added in the future MUST default to the pass-through `Promise.reject`
+ * path — never widen the 401 branch.
  *
  * All rejections are normalized to the `ApiError['error']` shape so consumers
  * branch on a machine-readable `code` and never parse `message`.

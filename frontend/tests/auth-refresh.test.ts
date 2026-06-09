@@ -96,4 +96,34 @@ describe('apiClient — single-flight 401 refresh', () => {
     expect(refreshCalls).toBe(0);
     expect(useAuthStore.getState().accessToken).toBe('valid-token');
   });
+
+  // 429 = "rate limited" — must NOT trigger refresh or clear the session.
+  // The user is still signed in, they just need to slow down. Same regression
+  // shape as the 403 case but a different code path; #20 originally tripped
+  // when the interceptor widened the refresh branch to anything-non-2xx and
+  // 429s started logging users out. Pin it.
+  it('does NOT clear the session on a 429 RATE_LIMITED response', async () => {
+    useAuthStore.getState().setAccessToken('valid-token');
+    let refreshCalls = 0;
+
+    server.use(
+      http.post(`${BASE}/auth/refresh`, () => {
+        refreshCalls += 1;
+        return HttpResponse.json({ success: true, data: { accessToken: 'fresh' } });
+      }),
+      http.get(`${BASE}/auth/me`, () =>
+        HttpResponse.json(
+          { success: false, error: { code: 'RATE_LIMITED', message: 'too fast' } },
+          { status: 429, headers: { 'Retry-After': '30' } },
+        ),
+      ),
+    );
+
+    await expect(apiClient.get('/auth/me')).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+      details: { retryAfter: 30 },
+    });
+    expect(refreshCalls).toBe(0);
+    expect(useAuthStore.getState().accessToken).toBe('valid-token');
+  });
 });
