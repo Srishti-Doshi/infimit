@@ -363,7 +363,7 @@ export interface ArticleViewer {
 export async function getArticleById(
   id: string,
   viewer: ArticleViewer | null,
-): Promise<ArticleModel> {
+): Promise<ArticleListItemView> {
   if (!Types.ObjectId.isValid(id)) {
     throw ApiError.notFound('Article not found');
   }
@@ -377,7 +377,11 @@ export async function getArticleById(
     throw ApiError.forbidden('Not permitted to view this article');
   }
 
-  return article;
+  const authors = await loadAuthorsByIds([article.authorId]);
+  return {
+    ...(article.toJSON() as Record<string, unknown>),
+    author: authors.get(article.authorId.toString()) ?? null,
+  };
 }
 
 export interface ListInput {

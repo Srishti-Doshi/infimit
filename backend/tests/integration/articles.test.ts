@@ -357,6 +357,29 @@ describe('GET /v1/articles/:id', () => {
       .set('Authorization', `Bearer ${stranger.token}`);
     expect(strangerRes.status).toBe(403);
   });
+
+  // PR #59 added author projection to `getArticleBySlug` + `listArticles` but
+  // missed `getArticleById`. FE consumers (editor preview, author draft edit)
+  // expect `article.author: { id, name } | null` and fall back to "Unknown
+  // author" without it. Pins #76.
+  it('response includes author projection (id + name)', async () => {
+    const author = await seedUser('author');
+    const cover = await seedCoverMedia(author.id);
+    const created = await request(app)
+      .post('/v1/articles')
+      .set('Authorization', `Bearer ${author.token}`)
+      .send(VALID_CREATE_BODY(cover));
+
+    const res = await request(app)
+      .get(`/v1/articles/${created.body.data.article.id}`)
+      .set('Authorization', `Bearer ${author.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.article.author).toEqual({
+      id: author.id,
+      name: 'author user',
+    });
+  });
 });
 
 // ─── GET /v1/articles (list) ────────────────────────────────────────────
