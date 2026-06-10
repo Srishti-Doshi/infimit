@@ -174,3 +174,31 @@ export async function presignDownload(key: string, ttlSec?: number): Promise<str
   });
   return getSignedUrl(s3, command, { expiresIn });
 }
+
+/**
+ * Fetch the first `bytes` bytes of an S3 object via a Range GET. Used by
+ * the media register flow to magic-byte-sniff uploaded files — defends
+ * against a tampered FE that claimed `application/pdf` at presign to pass
+ * the cap check, then PUT arbitrary bytes (e.g. a renamed JPEG) to S3.
+ *
+ * Range GET costs a fraction of a full GET — most metadata-and-magic
+ * verification needs only the first 16 bytes.
+ */
+export async function fetchObjectHead(key: string, bytes: number): Promise<Buffer> {
+  const env = loadEnv();
+  const s3 = getS3();
+  const command = new GetObjectCommand({
+    Bucket: env.S3_BUCKET,
+    Key: key,
+    Range: `bytes=0-${bytes - 1}`,
+  });
+  const response = await s3.send(command);
+  if (!response.Body) {
+    throw new Error('S3 returned empty body for Range GET');
+  }
+  const chunks: Buffer[] = [];
+  for await (const chunk of response.Body as AsyncIterable<Buffer | Uint8Array>) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
