@@ -23,6 +23,10 @@ interface AISummaryBlockProps {
  *     (status === 'approved' but `ai.summary` empty) — the approve handler
  *     fires the pipeline asynchronously, so there's a window where the
  *     editor sees the approve toast but no summary yet.
+ *   - Rendered with the degraded badge + retry message when
+ *     `ai.degraded === true` even if `ai.summary` is empty — surfaces the
+ *     circuit-open state to the editor so they can hit Regenerate instead
+ *     of staring at a silently-missing block. Pins #75.
  *
  * Degraded UX (per FE handler doc §4):
  *   - `ai.degraded === true` shows a subtle inline warning badge "Fallback
@@ -63,7 +67,7 @@ export function AISummaryBlock({ article }: AISummaryBlockProps): JSX.Element | 
   ) {
     return null;
   }
-  if (!hasSummary && !isAwaitingPipeline) return null;
+  if (!hasSummary && !isAwaitingPipeline && !ai?.degraded) return null;
 
   return (
     <Card className="mt-6 border-brand-red-50 bg-brand-red-50/30">
@@ -95,8 +99,12 @@ export function AISummaryBlock({ article }: AISummaryBlockProps): JSX.Element | 
             <p className="text-body-base italic text-ink-tertiary">
               The AI pipeline is still running. Refresh in a moment, or click Regenerate to retry.
             </p>
-          ) : (
+          ) : hasSummary ? (
             <p className="text-body-base text-ink-primary">{ai?.summary}</p>
+          ) : (
+            <p className="text-body-base italic text-ink-tertiary">
+              The AI service couldn&apos;t generate a summary. Click Regenerate to retry.
+            </p>
           )}
         </div>
 
