@@ -81,6 +81,10 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Home', href: '/', icon: Home, end: true },
   { label: 'Admin console', href: '/dashboard/admin', icon: LayoutDashboard, end: true },
   { label: 'Approvals queue', href: '/dashboard/admin/approvals', icon: ClipboardCheck },
+  // Admin role inherits editor capabilities via RBAC hierarchy, so the
+  // comment moderation queue belongs in the admin sidebar too — mirroring
+  // the order it has in EDITOR_NAV. Pins #99.
+  { label: 'Pending comments', href: '/dashboard/editor/comments/pending', icon: MessageSquare },
   { label: 'Articles', href: '/dashboard/admin/articles', icon: FileText },
   { label: 'Authors', href: '/dashboard/admin/authors', icon: ShieldCheck },
   { label: 'Editors', href: '/dashboard/admin/editors', icon: Users },

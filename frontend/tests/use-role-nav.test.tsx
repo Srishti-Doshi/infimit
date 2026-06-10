@@ -66,7 +66,7 @@ describe('useRoleNav', () => {
     ]);
   });
 
-  it('returns admin nav with Admin console + Articles + Authors + Editors + Organisations + E-papers + My drafts when user role is admin', () => {
+  it('returns admin nav with Admin console + moderation queues + management + My drafts when user role is admin', () => {
     useAuthStore.setState({ user: makeUser('admin') });
     const { result } = renderHook(() => useRoleNav());
     expect(result.current.roleLabel).toBe('Admin');
@@ -74,6 +74,9 @@ describe('useRoleNav', () => {
       'Home',
       'Admin console',
       'Approvals queue',
+      // Admin inherits editor capabilities — comment moderation queue
+      // belongs here too (pins #99).
+      'Pending comments',
       'Articles',
       'Authors',
       'Editors',
