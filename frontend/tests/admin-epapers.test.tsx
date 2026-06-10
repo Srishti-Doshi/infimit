@@ -1,7 +1,7 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { server } from '@/mocks/server';
 import AdminEpapersPage from '@/pages/dashboard/admin/epapers';
@@ -68,14 +68,9 @@ describe('<AdminEpapersPage>', () => {
     expect(screen.getAllByRole('link', { name: /new issue/i }).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('deletes an issue when the row Delete button is clicked + confirmed', async () => {
+  it('deletes an issue when the row Delete button is clicked + confirmed in the modal', async () => {
     signInAsAdmin();
     const user = userEvent.setup();
-
-    // window.confirm — happy-dom returns true by default for confirm() with
-    // no implementation, but we pin it explicitly so the test doesn't break
-    // if that default changes.
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     const deleteCalls: string[] = [];
     server.use(
@@ -88,11 +83,13 @@ describe('<AdminEpapersPage>', () => {
     renderWithProviders(<AdminEpapersPage />);
 
     await screen.findByText(/morning edition — 30 may 2026/i);
+    // Click the row's Delete affordance → opens the confirmation modal.
     await user.click(screen.getByRole('button', { name: /delete morning edition/i }));
 
-    await waitFor(() => expect(deleteCalls).toEqual(['epp_2026_05_30']));
-    expect(confirmSpy).toHaveBeenCalled();
+    // Modal should now be open. Click the modal's confirm Delete button.
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /^delete$/i }));
 
-    confirmSpy.mockRestore();
+    await waitFor(() => expect(deleteCalls).toEqual(['epp_2026_05_30']));
   });
 });
