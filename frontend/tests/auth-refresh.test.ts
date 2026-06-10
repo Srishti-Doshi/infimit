@@ -127,3 +127,26 @@ describe('apiClient — single-flight 401 refresh', () => {
     expect(useAuthStore.getState().accessToken).toBe('valid-token');
   });
 });
+
+// `toApiError` must surface the HTTP status into `details.status` for envelope
+// errors — the React Query retry guard at `lib/query-client.ts:22-32` reads
+// that field to skip 4xx retries (except 408/429). Pre-fix, envelope errors
+// dropped the status, defeating the guard and triggering up to 3 retries on
+// every 404. Pins #87.
+describe('apiClient — error envelope status surfacing', () => {
+  it('includes HTTP status in details for envelope errors (404)', async () => {
+    server.use(
+      http.get(`${BASE}/articles/missing`, () =>
+        HttpResponse.json(
+          { success: false, error: { code: 'NOT_FOUND', message: 'No such article' } },
+          { status: 404 },
+        ),
+      ),
+    );
+
+    await expect(apiClient.get('/articles/missing')).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      details: { status: 404 },
+    });
+  });
+});

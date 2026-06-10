@@ -106,7 +106,7 @@ function toApiError(error: AxiosError<ApiError>): ApiError['error'] {
   if (error.response?.data?.success === false) {
     const body = error.response.data.error;
     const baseDetails = (body.details as Record<string, unknown> | undefined) ?? {};
-    return { ...body, details: { ...baseDetails, ...retryDetail } };
+    return { ...body, details: { ...baseDetails, status: error.response.status, ...retryDetail } };
   }
   return {
     code: error.code ?? 'NETWORK_ERROR',
