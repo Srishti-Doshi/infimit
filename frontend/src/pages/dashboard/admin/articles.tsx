@@ -147,7 +147,18 @@ function ArticleRow({ article, onAction }: ArticleRowProps): JSX.Element {
   return (
     <tr>
       <Td className="font-medium text-ink-primary">
-        <span title={article.title}>{article.title}</span>
+        {/* Title navigates to the editor preview so admins can inspect the
+            article's internals (body, AI summary, regenerate affordance)
+            and use the editor's full action toolbar. Pins #74 — the editor
+            preview was previously only reachable from the submitted-only
+            approvals queue or by typing the URL directly. */}
+        <Link
+          to={`/dashboard/editor/approvals/${article.id}`}
+          className="hover:text-brand-red-600"
+          title={article.title}
+        >
+          {article.title}
+        </Link>
       </Td>
       <Td>
         <ArticleStatusBadge status={article.status} />
