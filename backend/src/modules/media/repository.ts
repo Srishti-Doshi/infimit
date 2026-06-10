@@ -65,3 +65,26 @@ export async function deleteById(id: Types.ObjectId | string): Promise<boolean> 
   const result = await Media.deleteOne({ _id: id }).exec();
   return result.deletedCount === 1;
 }
+
+/**
+ * List orphan media docs: `refCount === 0` AND created before `olderThan`.
+ *
+ * The grace cutoff exists because a freshly-uploaded media doc starts at
+ * `refCount: 0` (the article that will reference it hasn't been persisted
+ * yet — there's a window during the upload-url → register → article-create
+ * dance where the doc is legitimately at 0). Sweeping these would race the
+ * happy path. Default grace is 1 hour, which comfortably covers any
+ * upload-and-publish flow.
+ *
+ * Caps at `limit` per call so the sweeper can paginate through a large
+ * backlog without holding too many docs in memory.
+ */
+export async function findOrphans(olderThan: Date, limit: number): Promise<MediaModel[]> {
+  return Media.find({
+    refCount: 0,
+    createdAt: { $lt: olderThan },
+  })
+    .sort({ createdAt: 1 })
+    .limit(limit)
+    .exec();
+}
