@@ -45,8 +45,11 @@ export async function createEpaper(input: CreateEpaperInput): Promise<EpaperMode
   if (input.actorRole !== 'admin') {
     throw ApiError.forbidden('Only admins can publish e-paper issues');
   }
-  if (!Types.ObjectId.isValid(input.pdfMediaId) || !Types.ObjectId.isValid(input.coverMediaId)) {
-    throw ApiError.validation('Invalid media id');
+  if (!Types.ObjectId.isValid(input.pdfMediaId)) {
+    throw ApiError.validation('PDF file is required', { field: 'pdfMediaId' });
+  }
+  if (!Types.ObjectId.isValid(input.coverMediaId)) {
+    throw ApiError.validation('Cover image is required', { field: 'coverMediaId' });
   }
 
   // Verify the referenced media docs exist + are the right MIME class. The
