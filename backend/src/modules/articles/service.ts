@@ -832,7 +832,7 @@ export async function publishArticle(input: PublishArticleInput): Promise<Articl
     fromStatus: article.status,
     toStatus: 'published',
     version: article.version,
-    set: { publishedAt: new Date() },
+    set: { publishedAt: article.publishedAt ?? new Date() },
   });
   if (!transitioned) {
     throw new ApiError(409, ErrorCode.VERSION_CONFLICT, 'Article was modified elsewhere', {

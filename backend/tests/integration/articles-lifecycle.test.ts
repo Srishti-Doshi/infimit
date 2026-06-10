@@ -343,19 +343,23 @@ describe('POST /v1/articles/:id/publish', () => {
     expect(res.status).toBe(403);
   });
 
-  it('editor re-publishes an unpublished article → status=published, publishedAt freshened', async () => {
+  it('editor re-publishes an unpublished article → status=published, publishedAt preserved', async () => {
     const author = await seedUser('author');
     const editor = await seedUser('editor');
     const { id } = await seedUnpublishedArticle(author.id);
 
-    const before = Date.now();
+    const seeded = await Article.findById(id);
+    const originalPublishedAt = seeded?.publishedAt as Date;
+
     const res = await request(app)
       .post(`/v1/articles/${id}/publish`)
       .set('Authorization', `Bearer ${editor.token}`);
 
     expect(res.status).toBe(200);
     expect(res.body.data.article.status).toBe('published');
-    expect(new Date(res.body.data.article.publishedAt).getTime()).toBeGreaterThanOrEqual(before);
+    expect(new Date(res.body.data.article.publishedAt).getTime()).toBe(
+      originalPublishedAt.getTime(),
+    );
   });
 });
 
