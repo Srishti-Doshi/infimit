@@ -78,7 +78,7 @@ export const updateArticleHandler = asyncHandler(async (req: Request, res: Respo
 export const getArticleHandler = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params as { id: string };
   const article = await getArticleById(id, req.user ?? null);
-  res.status(200).json({ success: true, data: { article: article.toJSON() } });
+  res.status(200).json({ success: true, data: { article } });
 });
 
 export const listArticlesHandler = asyncHandler(async (req: Request, res: Response) => {
