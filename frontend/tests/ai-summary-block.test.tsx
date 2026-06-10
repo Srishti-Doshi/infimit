@@ -112,6 +112,37 @@ describe('<AISummaryBlock>', () => {
     expect(screen.getByText(/circuit-open/i)).toBeInTheDocument();
   });
 
+  // Pins #75. Pre-fix, the block returned null when `ai.summary` was empty
+  // AND status was not 'approved' (so the awaiting-pipeline branch didn't
+  // fire either) — even if `ai.degraded` was true. The whole AI surface
+  // silently disappeared on circuit-open, so editors had no UI affordance
+  // to hit Regenerate. Now the degraded flag keeps the block alive and a
+  // dedicated body branch renders a "couldn't generate, retry" message.
+  it('renders the degraded badge + fallback message when ai.degraded is true and summary is empty', () => {
+    renderWithProviders(
+      <AISummaryBlock
+        article={makeArticle({
+          status: 'published',
+          ai: {
+            summary: '',
+            keywords: [],
+            readingTimeMin: 0,
+            ttsAudioUrl: null,
+            degraded: true,
+            model: 'circuit-open',
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: /ai summary/i })).toBeInTheDocument();
+    expect(screen.getByText(/fallback summary — regenerate to retry/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/ai service couldn't generate a summary.*click regenerate to retry/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /regenerate/i })).toBeEnabled();
+  });
+
   it('shows the awaiting-pipeline copy when approved but ai.summary is empty', () => {
     renderWithProviders(
       <AISummaryBlock article={makeArticle({ status: 'approved', ai: undefined })} />,
