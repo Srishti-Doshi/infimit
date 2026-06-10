@@ -22,12 +22,13 @@
 import { randomUUID } from 'node:crypto';
 import { Types } from 'mongoose';
 
-import { deleteObject, presignUpload, publicUrlFor } from '@/config/s3';
+import { deleteObject, fetchObjectHead, presignUpload, publicUrlFor } from '@/config/s3';
 import { auditLog } from '@/shared/audit';
 import { ApiError } from '@/shared/errors';
 import { ErrorCode } from '@/shared/errors/errorCodes';
 
 import { checkMediaCap, extensionFor } from './caps';
+import { MAGIC_BYTES_HEAD_SIZE, verifyMagic } from './magic-bytes';
 import type { MediaDimensions, MediaModel, MediaPurpose } from './model';
 import * as mediaRepo from './repository';
 
@@ -134,6 +135,57 @@ export async function registerUpload(input: RegisterUploadInput): Promise<MediaM
   const existing = await mediaRepo.findByKey(input.key);
   if (existing) {
     return existing;
+  }
+
+  // Magic-byte verification — fetch the first bytes of the uploaded object
+  // from S3 and verify they match the claimed mimeType. Defends against a
+  // tampered FE that claimed e.g. `application/pdf` at presign (to pass the
+  // cap) but PUT arbitrary bytes (e.g. a renamed JPEG) to the presigned URL.
+  // Caps + Content-Type-bound presign are layers 1-2 of MIME defence; this
+  // is layer 3, the only one that actually inspects the bytes on disk.
+  let head: Buffer;
+  try {
+    head = await fetchObjectHead(input.key, MAGIC_BYTES_HEAD_SIZE);
+  } catch (err) {
+    // Range GET failed — object never landed (FE skipped the PUT), or a
+    // transient S3 error. Refuse the registration rather than persist a doc
+    // pointing at unverifiable bytes.
+    throw ApiError.validation('Unable to verify uploaded file contents', {
+      reason: 'magic-check-failed',
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  const magic = verifyMagic(input.mimeType, head);
+  if (!magic.ok) {
+    // Caller's claim was wrong. Delete the orphan S3 object best-effort so
+    // mis-typed bytes don't linger — the sweeper would eventually GC them
+    // but eager cleanup at the source of truth is cleaner.
+    try {
+      await deleteObject(input.key);
+    } catch (err) {
+      auditLog(
+        {
+          entity: 'media',
+          action: 'magic_mismatch_cleanup_failed',
+          actor: input.uploadedBy,
+          details: {
+            key: input.key,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        },
+        'media_magic_mismatch_cleanup_failed',
+      );
+    }
+    throw ApiError.validation(
+      `Uploaded file does not match the claimed MIME type '${input.mimeType}'`,
+      {
+        reason: 'mime-mismatch',
+        purpose,
+        claimed: input.mimeType,
+        expected: magic.expected,
+      },
+    );
   }
 
   const media = await mediaRepo.createMedia({

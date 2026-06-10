@@ -15,8 +15,15 @@ import { User, type UserRole } from '@/modules/users';
 import { hashPassword, signAccessToken } from '@/shared/crypto';
 
 import { resetTestDb, startTestEnv, stopTestEnv } from './_setup';
+import { __setUploadedBytes } from './_s3Mock';
 
 let app: Express;
+
+// Magic-byte signatures used to simulate "real" uploads in the mock S3.
+// The register flow Range-GETs the first bytes and verifies against these.
+const JPEG_MAGIC = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const PDF_MAGIC = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37]);
 
 interface SeededUser {
   id: string;
@@ -130,6 +137,10 @@ describe('POST /v1/media/register', () => {
       .send({ mimeType: 'image/jpeg', size: 100_000, purpose: 'article_cover' });
     const { key } = presign.body.data;
 
+    // Step 1.5: simulate the FE's PUT to S3 by stashing JPEG magic bytes for
+    // the register flow's Range-GET to find.
+    __setUploadedBytes(key, JPEG_MAGIC);
+
     // Step 2: register
     const reg = await request(app)
       .post('/v1/media/register')
@@ -155,6 +166,7 @@ describe('POST /v1/media/register', () => {
       .set('Authorization', `Bearer ${user.token}`)
       .send({ mimeType: 'image/png', size: 50_000, purpose: 'author_avatar' });
     const { key } = presign.body.data;
+    __setUploadedBytes(key, PNG_MAGIC);
 
     const first = await request(app)
       .post('/v1/media/register')
@@ -198,6 +210,62 @@ describe('POST /v1/media/register', () => {
       .send({ key, mimeType: 'image/jpeg', size: 5 * 1024 * 1024 });
     expect(res.status).toBe(422);
     expect(res.body.error.details).toMatchObject({ reason: 'size', purpose: 'author_avatar' });
+  });
+
+  // Pins #80 — magic-byte (defence-in-depth) verification. A tampered FE
+  // can claim `application/pdf` at presign to satisfy the cap, then PUT
+  // non-PDF bytes (e.g. a renamed JPEG) to the presigned URL. The register
+  // flow Range-GETs the first bytes and must reject the mismatch.
+  it('rejects register when uploaded bytes do not match the claimed MIME (PDF claim + JPEG bytes)', async () => {
+    const user = await seedUser('admin');
+    const presign = await request(app)
+      .post('/v1/media/upload-url')
+      .set('Authorization', `Bearer ${user.token}`)
+      .send({ mimeType: 'application/pdf', size: 500_000, purpose: 'epaper_pdf' });
+    const { key } = presign.body.data;
+
+    // The FE claimed PDF — but it actually PUT JPEG bytes to S3.
+    __setUploadedBytes(key, JPEG_MAGIC);
+
+    const res = await request(app)
+      .post('/v1/media/register')
+      .set('Authorization', `Bearer ${user.token}`)
+      .send({ key, mimeType: 'application/pdf', size: 500_000 });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.body.error.details).toMatchObject({
+      reason: 'mime-mismatch',
+      purpose: 'epaper_pdf',
+      claimed: 'application/pdf',
+    });
+    expect(res.body.error.details.expected).toMatch(/PDF/);
+
+    // No Media doc should have been created — the spoofed upload must not
+    // persist even though everything else (cap, size, key shape) was valid.
+    const persisted = await Media.findOne({ key });
+    expect(persisted).toBeNull();
+  });
+
+  it('accepts register when uploaded bytes match the claimed MIME (real PDF)', async () => {
+    const user = await seedUser('admin');
+    const presign = await request(app)
+      .post('/v1/media/upload-url')
+      .set('Authorization', `Bearer ${user.token}`)
+      .send({ mimeType: 'application/pdf', size: 500_000, purpose: 'epaper_pdf' });
+    const { key } = presign.body.data;
+
+    // Real PDF: %PDF-1.7 magic bytes at offset 0.
+    __setUploadedBytes(key, PDF_MAGIC);
+
+    const res = await request(app)
+      .post('/v1/media/register')
+      .set('Authorization', `Bearer ${user.token}`)
+      .send({ key, mimeType: 'application/pdf', size: 500_000 });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.media.mimeType).toBe('application/pdf');
+    expect(res.body.data.media.purpose).toBe('epaper_pdf');
   });
 });
 
