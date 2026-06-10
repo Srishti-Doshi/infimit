@@ -74,7 +74,7 @@ describe('<AdminArticlesPage>', () => {
     expect(screen.getByRole('button', { name: /^re-publish$/i })).toBeInTheDocument();
   });
 
-  it('filters out non-published/unpublished statuses (drafts hidden from the surface)', async () => {
+  it('sends status=published,unpublished filter to the BE (pins #77 server-side scoping)', async () => {
     const published = makeArticle({
       id: 'art_pub_001',
       title: 'Live article',
@@ -82,29 +82,26 @@ describe('<AdminArticlesPage>', () => {
       status: 'published',
       publishedAt: '2026-06-01T10:00:00.000Z',
     });
-    // A draft and a submitted article should NOT appear in this surface.
-    const draftItem = { ...mockDrafts[0]!, id: 'art_draft_xx', title: 'Hidden draft' };
-    const submittedItem = {
-      ...mockDrafts[0]!,
-      id: 'art_sub_xx',
-      title: 'Hidden submission',
-      status: 'submitted' as const,
-    };
+    // Draft / submitted items are intentionally not seeded — post-#77 the BE
+    // filter prevents them from reaching the wire. The test asserts that the
+    // FE sends the right filter and renders the BE's pre-scoped response.
 
+    let capturedStatus: string | null = null;
     server.use(
-      http.get(`${BASE}/articles`, () =>
-        HttpResponse.json({
+      http.get(`${BASE}/articles`, ({ request }) => {
+        const url = new URL(request.url);
+        capturedStatus = url.searchParams.get('status');
+        return HttpResponse.json({
           success: true,
-          data: { items: [published, draftItem, submittedItem], total: 3 },
-        }),
-      ),
+          data: { items: [published], total: 1 },
+        });
+      }),
     );
 
     renderPage();
 
     expect(await screen.findByText('Live article')).toBeInTheDocument();
-    expect(screen.queryByText('Hidden draft')).not.toBeInTheDocument();
-    expect(screen.queryByText('Hidden submission')).not.toBeInTheDocument();
+    expect(capturedStatus).toBe('published,unpublished');
   });
 
   it('opens a confirm modal and posts to /unpublish when admin confirms', async () => {

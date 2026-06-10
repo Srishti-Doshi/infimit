@@ -54,20 +54,17 @@ export default function AdminArticlesPage(): JSX.Element {
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'articles'],
-    queryFn: () => listArticles({}),
+    queryFn: () => listArticles({ status: ['published', 'unpublished'] }),
   });
 
-  // Client-side filter: only published + unpublished are relevant on this
-  // surface. Drafts / submitted / approved / rejected belong to the
-  // approvals queue. Sorted publishedAt desc so the most recently
-  // (un)published article surfaces first.
-  const managedArticles = (data?.items ?? [])
-    .filter((a) => a.status === 'published' || a.status === 'unpublished')
-    .sort((a, b) => {
-      const aTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
-      const bTime = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
-      return bTime - aTime;
-    });
+  // BE filter is authoritative (pins #77 — drafts / submitted / approved /
+  // rejected never reach the wire). FE only sorts by publishedAt desc so
+  // the most recently (un)published article surfaces first.
+  const managedArticles = (data?.items ?? []).slice().sort((a, b) => {
+    const aTime = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+    const bTime = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+    return bTime - aTime;
+  });
 
   return (
     <Container width="default" className="py-12">

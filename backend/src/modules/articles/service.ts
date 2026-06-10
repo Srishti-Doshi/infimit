@@ -385,7 +385,8 @@ export async function getArticleById(
 }
 
 export interface ListInput {
-  status?: ArticleStatus;
+  /** Filter to a specific subset of statuses. Single value or list. */
+  status?: ArticleStatus[];
   /** 'me' resolves to the viewer's id; anything else passes through for editor/admin. */
   authorId?: string | 'me';
   page?: number;
@@ -400,7 +401,9 @@ export async function listArticles(input: ListInput): Promise<{
   limit: number;
 }> {
   const filter: Record<string, unknown> = {};
-  if (input.status) filter.status = input.status;
+  if (input.status?.length) {
+    filter.status = input.status.length === 1 ? input.status[0] : { $in: input.status };
+  }
 
   // RBAC + scope:
   //  - authors are restricted to their own articles regardless of the
