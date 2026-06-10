@@ -90,10 +90,34 @@ export type UpdateArticleBody = z.infer<typeof updateArticleBodySchema>;
  * filters (published articles, sorted, paginated, with category/location) land
  * in later subphases — the schema is purposefully tight here.
  */
+const ARTICLE_STATUS_VALUES = [
+  'draft',
+  'submitted',
+  'approved',
+  'published',
+  'rejected',
+  'unpublished',
+] as const;
+
+/**
+ * `?status=` accepts either a single value (back-compat with Subphase 3
+ * callers) OR a comma-separated list (`?status=published,unpublished`) OR
+ * repeated query params (`?status=published&status=unpublished`). The Zod
+ * preprocess normalises to a deduped array; the service applies `$in` when
+ * the array has more than one element. Pins #77 — the admin articles surface
+ * no longer needs to over-fetch and filter client-side.
+ */
+const statusFilter = z
+  .union([z.string(), z.array(z.string())])
+  .transform((v) =>
+    (Array.isArray(v) ? v : v.split(','))
+      .map((s) => s.trim())
+      .filter((s, i, arr) => s.length > 0 && arr.indexOf(s) === i),
+  )
+  .pipe(z.array(z.enum(ARTICLE_STATUS_VALUES)).min(1).max(ARTICLE_STATUS_VALUES.length));
+
 export const listArticlesQuerySchema = z.object({
-  status: z
-    .enum(['draft', 'submitted', 'approved', 'published', 'rejected', 'unpublished'])
-    .optional(),
+  status: statusFilter.optional(),
   authorId: z.union([z.literal('me'), objectIdString]).optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
