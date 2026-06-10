@@ -28,6 +28,84 @@ import * as commentsRepo from './repository';
 import { commentEvents } from './events';
 import type { CommentDocument, CommentModel, CommentStatus } from './model';
 
+// ─── view shaping ───────────────────────────────────────────────────────
+
+interface CommenterView {
+  id: string;
+  name: string;
+}
+
+interface CommentArticleRef {
+  id: string;
+  title: string;
+  slug: string;
+}
+
+interface CommentListItemView {
+  [key: string]: unknown;
+  author: CommenterView | null;
+  article?: CommentArticleRef | null;
+}
+
+/**
+ * Batch-load commenter user docs for a set of `userId`s. Returns a Map keyed
+ * by user id string so list endpoints can attach `author: { id, name }`
+ * alongside the existing `userId` reference — same pattern as
+ * `articles/service.ts loadAuthorsByIds`. Includes soft-deleted users so the
+ * byline still renders if the commenter later deactivated their account.
+ * Pins #72.
+ */
+async function loadCommenters(
+  userIds: ReadonlyArray<Types.ObjectId>,
+): Promise<Map<string, CommenterView>> {
+  const seen = new Set<string>();
+  const unique: Types.ObjectId[] = [];
+  for (const id of userIds) {
+    const k = id.toString();
+    if (!seen.has(k)) {
+      seen.add(k);
+      unique.push(id);
+    }
+  }
+  if (unique.length === 0) return new Map();
+  const users = await usersRepo.findManyByIds(unique);
+  return new Map(users.map((u) => [u._id.toString(), { id: u._id.toString(), name: u.name }]));
+}
+
+/**
+ * Batch-resolve article projections for the moderation queue so editors can
+ * click through from a pending comment to the article context. Same pattern
+ * as `loadCommenters` — dedupe + lookup. Uses `articlesRepo.findById` per
+ * unique id; for the default page size (20) that's a handful of indexed
+ * lookups, well within budget. Pins the article-context half of #72.
+ */
+async function loadArticlesForComments(
+  articleIds: ReadonlyArray<Types.ObjectId>,
+): Promise<Map<string, CommentArticleRef>> {
+  const seen = new Set<string>();
+  const unique: Types.ObjectId[] = [];
+  for (const id of articleIds) {
+    const k = id.toString();
+    if (!seen.has(k)) {
+      seen.add(k);
+      unique.push(id);
+    }
+  }
+  if (unique.length === 0) return new Map();
+  const results = await Promise.all(unique.map((id) => articlesRepo.findById(id)));
+  const map = new Map<string, CommentArticleRef>();
+  for (const article of results) {
+    if (article) {
+      map.set(article._id.toString(), {
+        id: article._id.toString(),
+        title: article.title,
+        slug: article.slug,
+      });
+    }
+  }
+  return map;
+}
+
 // ─── post comment ───────────────────────────────────────────────────────
 
 export interface PostCommentInput {
@@ -93,7 +171,7 @@ export async function postComment(input: PostCommentInput): Promise<CommentModel
 export async function listForArticle(
   articleId: string,
   options: { page?: number; limit?: number } = {},
-): Promise<{ items: CommentModel[]; total: number; page: number; limit: number }> {
+): Promise<{ items: CommentListItemView[]; total: number; page: number; limit: number }> {
   if (!Types.ObjectId.isValid(articleId)) {
     throw ApiError.notFound('Article not found');
   }
@@ -104,8 +182,13 @@ export async function listForArticle(
   };
 
   const { items, total } = await commentsRepo.listByFilter(filter, options);
+  const commenters = await loadCommenters(items.map((c) => c.userId));
+  const shaped: CommentListItemView[] = items.map((c) => ({
+    ...(c.toJSON() as Record<string, unknown>),
+    author: commenters.get(c.userId.toString()) ?? null,
+  }));
   return {
-    items,
+    items: shaped,
     total,
     page: options.page ?? 1,
     limit: options.limit ?? 20,
@@ -118,7 +201,7 @@ export async function listPending(input: {
   actorRole: UserRole;
   page?: number;
   limit?: number;
-}): Promise<{ items: CommentModel[]; total: number; page: number; limit: number }> {
+}): Promise<{ items: CommentListItemView[]; total: number; page: number; limit: number }> {
   if (input.actorRole !== 'editor' && input.actorRole !== 'admin') {
     throw ApiError.forbidden('Only editors or admins can view the moderation queue');
   }
@@ -127,9 +210,18 @@ export async function listPending(input: {
     { status: 'pending' },
     { page: input.page, limit: input.limit },
   );
+  const [commenters, articles] = await Promise.all([
+    loadCommenters(items.map((c) => c.userId)),
+    loadArticlesForComments(items.map((c) => c.articleId)),
+  ]);
+  const shaped: CommentListItemView[] = items.map((c) => ({
+    ...(c.toJSON() as Record<string, unknown>),
+    author: commenters.get(c.userId.toString()) ?? null,
+    article: articles.get(c.articleId.toString()) ?? null,
+  }));
 
   return {
-    items,
+    items: shaped,
     total,
     page: input.page ?? 1,
     limit: input.limit ?? 20,

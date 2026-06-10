@@ -129,7 +129,7 @@ export function CommentThread({ articleId }: CommentThreadProps): JSX.Element {
         </form>
       ) : (
         <Card className="mt-6 bg-surface-subtle">
-          <CardBody className="text-center">
+          <CardBody className="py-6 text-center">
             <p className="text-body-sm text-ink-secondary">
               <Link to="/auth/login" className="text-brand-red-600 hover:underline">
                 Sign in
@@ -158,7 +158,7 @@ export function CommentThread({ articleId }: CommentThreadProps): JSX.Element {
             <article key={comment.id} className="rounded-md border border-line p-4">
               <header className="flex items-baseline justify-between gap-3">
                 <p className="text-body-sm font-medium text-ink-primary">
-                  {comment.author?.name ?? 'Reader'}
+                  {comment.author?.name ?? 'Anonymous'}
                 </p>
                 <time dateTime={comment.createdAt} className="text-body-xs text-ink-tertiary">
                   {new Date(comment.createdAt).toLocaleDateString()}
