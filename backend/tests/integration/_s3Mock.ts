@@ -37,6 +37,7 @@ export function resetS3ForTests(): void {
   issued.length = 0;
   deleted.length = 0;
   uploadedBytes.clear();
+  nextDeleteError = null;
 }
 
 export async function presignUpload(
@@ -56,9 +57,25 @@ export function publicUrlFor(key: string): string {
   return `https://mock-cdn.test/${key}`;
 }
 
+let nextDeleteError: Error | null = null;
+
 export async function deleteObject(key: string): Promise<void> {
+  if (nextDeleteError) {
+    const err = nextDeleteError;
+    nextDeleteError = null;
+    throw err;
+  }
   deleted.push(key);
   uploadedBytes.delete(key);
+}
+
+/**
+ * Test-only — make the NEXT `deleteObject` call throw the given error. Used
+ * by sweeper tests to verify the "S3 transient error → still drop the
+ * Mongo doc" path. Resets to a normal delete after one throw.
+ */
+export function __setNextDeleteError(err: Error): void {
+  nextDeleteError = err;
 }
 
 /**

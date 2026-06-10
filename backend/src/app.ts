@@ -38,6 +38,8 @@ import {
 import { healthRoutes } from '@/modules/health';
 import apiV1 from './routes';
 import { registerEventListeners } from '@/modules/events';
+import { startMediaSweeper } from '@/modules/media/sweeper';
+import { loadEnv } from '@/config/env';
 
 const JSON_BODY_LIMIT = '1mb';
 
@@ -68,6 +70,14 @@ export function createApp(): Express {
   app.use(errorHandler);
 
   registerEventListeners();
+
+  // Background job: GC orphan media (refCount === 0, older than the grace
+  // period). Skipped in tests because `setInterval` would otherwise keep
+  // the suite from exiting cleanly; tests call `sweepOrphansOnce` directly
+  // when they need to exercise the logic. Pins #82.
+  if (loadEnv().NODE_ENV !== 'test') {
+    startMediaSweeper();
+  }
 
   return app;
 }
