@@ -1,9 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, FilePlus, Newspaper, Trash2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
-import { Button, Card, CardBody, Container, EmptyState, Skeleton, toast } from '@/components/ui';
+import {
+  Button,
+  Card,
+  CardBody,
+  Container,
+  EmptyState,
+  Modal,
+  ModalBody,
+  ModalDescription,
+  ModalTitle,
+  Skeleton,
+  toast,
+} from '@/components/ui';
 import { deleteEpaper, epaperDownloadUrl, listEpapers } from '@/lib/epaper-api';
 import { toastError } from '@/lib/error-messages';
 import type { ApiError } from '@/types/api';
@@ -21,6 +33,7 @@ import type { Epaper } from '@/types/epaper';
  */
 export default function AdminEpapersPage(): JSX.Element {
   const queryClient = useQueryClient();
+  const [deleteTarget, setDeleteTarget] = useState<Epaper | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['epapers', 'list'],
@@ -34,6 +47,7 @@ export default function AdminEpapersPage(): JSX.Element {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['epapers', 'list'] });
       toast.success('Issue deleted.');
+      setDeleteTarget(null);
     },
     onError: (error: ApiError['error']) => toastError(error),
   });
@@ -94,11 +108,7 @@ export default function AdminEpapersPage(): JSX.Element {
                     key={epaper.id}
                     epaper={epaper}
                     isDeleting={remove.isPending && remove.variables === epaper.id}
-                    onDelete={() => {
-                      if (window.confirm(`Delete "${epaper.title}"? This can't be undone.`)) {
-                        remove.mutate(epaper.id);
-                      }
-                    }}
+                    onDelete={() => setDeleteTarget(epaper)}
                   />
                 ))}
               </tbody>
@@ -106,6 +116,43 @@ export default function AdminEpapersPage(): JSX.Element {
           )}
         </CardBody>
       </Card>
+
+      <Modal
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && !remove.isPending && setDeleteTarget(null)}
+        size="sm"
+      >
+        <ModalBody className="px-6 py-7 sm:px-8">
+          <ModalTitle>Delete issue</ModalTitle>
+          <ModalDescription className="mt-2">
+            {deleteTarget ? (
+              <>
+                Delete{' '}
+                <strong className="text-ink-primary">&ldquo;{deleteTarget.title}&rdquo;</strong>?
+                This can&rsquo;t be undone.
+              </>
+            ) : null}
+          </ModalDescription>
+          <div className="mt-6 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDeleteTarget(null)}
+              disabled={remove.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              loading={remove.isPending}
+              onClick={() => deleteTarget && remove.mutate(deleteTarget.id)}
+            >
+              Delete
+            </Button>
+          </div>
+        </ModalBody>
+      </Modal>
     </Container>
   );
 }
