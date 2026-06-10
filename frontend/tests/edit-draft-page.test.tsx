@@ -84,6 +84,57 @@ describe('<EditDraftPage>', () => {
     expect(screen.getByRole('button', { name: /reload draft/i })).toBeInTheDocument();
   });
 
+  // Pins #100 — pre-fix the autosave PATCHed every field on every tick,
+  // including the (~5-20 KB) body even on a title-only edit. The fix
+  // tracks a `lastSavedRef` snapshot and only sends fields that diverged
+  // from it.
+  it('autosaves only the changed fields after a title-only edit (partial diff)', async () => {
+    const patchBodies: unknown[] = [];
+    server.use(
+      http.patch(`${BASE}/articles/:id`, async ({ request }) => {
+        const body = await request.json();
+        patchBodies.push(body);
+        // Echo the request shape back with a bumped version so the
+        // composer's local state advances correctly.
+        const incoming = body as Record<string, unknown>;
+        return HttpResponse.json({
+          success: true,
+          data: {
+            article: {
+              ...mockDrafts[0],
+              ...incoming,
+              version: ((incoming.version as number | undefined) ?? 0) + 1,
+            },
+          },
+        });
+      }),
+    );
+
+    renderAt('art_draft_001');
+
+    const title = await screen.findByDisplayValue(/untitled draft about campus accessibility/i);
+    fireEvent.change(title, {
+      target: { value: 'Untitled draft about campus accessibility [partial-diff]' },
+    });
+
+    await waitFor(() => expect(patchBodies.length).toBeGreaterThan(0), {
+      timeout: 6000,
+      interval: 200,
+    });
+
+    const sent = patchBodies[0] as Record<string, unknown>;
+    // Must include the changed title + the version token for OCC.
+    expect(sent.title).toMatch(/\[partial-diff\]/);
+    expect(typeof sent.version).toBe('number');
+    // Must NOT include unchanged fields — this is the #100 fix.
+    expect(sent).not.toHaveProperty('subtitle');
+    expect(sent).not.toHaveProperty('category');
+    expect(sent).not.toHaveProperty('tags');
+    expect(sent).not.toHaveProperty('body');
+    expect(sent).not.toHaveProperty('plainText');
+    expect(sent).not.toHaveProperty('coverImageMediaId');
+  }, 10000);
+
   it('shows the rejection banner with reason when article.status is rejected (#49)', async () => {
     const rejectedDraft = {
       ...mockDrafts[0]!,

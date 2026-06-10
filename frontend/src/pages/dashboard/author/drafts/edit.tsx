@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowLeft, Check, Loader2, MessageSquare, RefreshCw } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
@@ -54,6 +54,60 @@ interface EditFormValues {
   tags: string[];
 }
 
+/**
+ * Wire-shaped snapshot of the fields the composer ever sends. Used by the
+ * partial-diff in `save` so PATCH bodies only carry fields the user actually
+ * touched since the last successful save. Pins #100 — pre-fix the autosave
+ * spent ~5-20 KB per tick PATCHing the full body even on title-only edits,
+ * and every audit-log entry looked like the user touched everything.
+ */
+interface SavedWireState {
+  title: string;
+  subtitle: string | undefined;
+  category: ArticleCategory;
+  tags: string[];
+  body: string | undefined;
+  plainText: string | undefined;
+  coverImageMediaId: string | null;
+}
+
+function buildWireState(args: {
+  formValues: EditFormValues;
+  body: string;
+  plainText: string;
+  cover: CoverImageRef | null;
+}): SavedWireState {
+  return {
+    title: args.formValues.title,
+    subtitle: args.formValues.subtitle?.trim() ? args.formValues.subtitle.trim() : undefined,
+    category: args.formValues.category,
+    tags: args.formValues.tags,
+    body: args.body || undefined,
+    plainText: args.plainText || undefined,
+    coverImageMediaId: args.cover?.id ?? null,
+  };
+}
+
+/**
+ * Field-level diff between the current wire state and the last saved
+ * snapshot. Returns only fields whose value changed. Arrays compared via
+ * stringify (tags are an ordered string list, so structural equality is
+ * fine). Always returns a plain object — caller adds `version`.
+ */
+function diffWireState(current: SavedWireState, last: SavedWireState): Partial<SavedWireState> {
+  const patch: Partial<SavedWireState> = {};
+  if (current.title !== last.title) patch.title = current.title;
+  if (current.subtitle !== last.subtitle) patch.subtitle = current.subtitle;
+  if (current.category !== last.category) patch.category = current.category;
+  if (JSON.stringify(current.tags) !== JSON.stringify(last.tags)) patch.tags = current.tags;
+  if (current.body !== last.body) patch.body = current.body;
+  if (current.plainText !== last.plainText) patch.plainText = current.plainText;
+  if (current.coverImageMediaId !== last.coverImageMediaId) {
+    patch.coverImageMediaId = current.coverImageMediaId;
+  }
+  return patch;
+}
+
 function EditForm({ article }: { article: Article }): JSX.Element {
   const queryClient = useQueryClient();
   const [body, setBody] = useState(article.body ?? '');
@@ -65,6 +119,21 @@ function EditForm({ article }: { article: Article }): JSX.Element {
   );
   const [version, setVersion] = useState(article.version);
   const [conflict, setConflict] = useState(false);
+
+  // Snapshot of the wire state as of the last successful save. Initialised
+  // from the freshly-loaded article so the very first autosave only sends
+  // the fields the user actually changed since mount. Updated inside both
+  // `save` and `flushMutation.onSuccess` so they share a single source of
+  // truth for "what's already persisted".
+  const lastSavedRef = useRef<SavedWireState>({
+    title: article.title,
+    subtitle: article.subtitle?.trim() ? article.subtitle.trim() : undefined,
+    category: article.category,
+    tags: article.tags ?? [],
+    body: article.body || undefined,
+    plainText: article.plainText || undefined,
+    coverImageMediaId: article.coverImageMediaId ?? null,
+  });
 
   const { register, control, watch } = useForm<EditFormValues>({
     defaultValues: {
@@ -94,20 +163,17 @@ function EditForm({ article }: { article: Article }): JSX.Element {
     }),
     enabled: !conflict,
     save: async () => {
+      const current = buildWireState({ formValues, body, plainText, cover });
+      const patch = diffWireState(current, lastSavedRef.current);
+      // Zero-change autosave: the trigger string fired but every field
+      // matches the last snapshot (e.g. the user typed and immediately
+      // undid). Skip the round-trip; no payload to send.
+      if (Object.keys(patch).length === 0) return;
+
       try {
-        const updated = await updateDraft(article.id, {
-          title: formValues.title,
-          // Send `undefined` not `""` when empty so the BE doesn't persist a
-          // literal empty subtitle (clears the field cleanly on the model).
-          subtitle: formValues.subtitle?.trim() ? formValues.subtitle.trim() : undefined,
-          category: formValues.category,
-          tags: formValues.tags,
-          body: body || undefined,
-          plainText: plainText || undefined,
-          coverImageMediaId: cover?.id ?? null,
-          version,
-        });
+        const updated = await updateDraft(article.id, { ...patch, version });
         setVersion(updated.version);
+        lastSavedRef.current = current;
         // Intentionally NOT calling queryClient.setQueryData here. The parent
         // useQuery's `key={article.version}` would remount the form, and
         // Tiptap's mount-time onUpdate can normalize body HTML differently
@@ -155,18 +221,22 @@ function EditForm({ article }: { article: Article }): JSX.Element {
   });
 
   // Light mutation just for the "Save now" button — bypasses debounce.
+  // Shares the same partial-diff logic as the autosave path so an explicit
+  // click after several quiet edits sends the same compact payload.
   const flushMutation = useMutation({
-    mutationFn: () =>
-      updateDraft(article.id, {
-        title: formValues.title,
-        subtitle: formValues.subtitle?.trim() ? formValues.subtitle.trim() : undefined,
-        category: formValues.category,
-        tags: formValues.tags,
-        body: body || undefined,
-        plainText: plainText || undefined,
-        coverImageMediaId: cover?.id ?? null,
-        version,
-      }),
+    mutationFn: async () => {
+      const current = buildWireState({ formValues, body, plainText, cover });
+      const patch = diffWireState(current, lastSavedRef.current);
+      if (Object.keys(patch).length === 0) {
+        // Nothing to save — return the current article shape so onSuccess
+        // can still bump version state harmlessly (it'll match the current
+        // value).
+        return { ...article, version };
+      }
+      const updated = await updateDraft(article.id, { ...patch, version });
+      lastSavedRef.current = current;
+      return updated;
+    },
     onSuccess: (updated) => {
       setVersion(updated.version);
       // Same reason as the autosave path: don't sync into queryCache or
