@@ -19,7 +19,7 @@ import type { Article } from '@/types/article';
 export default function DraftsPage(): JSX.Element {
   const { data, isLoading } = useQuery({
     queryKey: ['articles', 'mine', 'draft'],
-    queryFn: () => listArticles({ authorId: 'me', status: 'draft' }),
+    queryFn: () => listArticles({ authorId: 'me', status: ['draft'] }),
   });
 
   const items = data?.items ?? [];

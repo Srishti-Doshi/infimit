@@ -24,7 +24,12 @@ export interface ArticlesListResult {
 }
 
 export interface ListArticlesQuery {
-  status?: ArticleStatus;
+  /**
+   * One or more statuses to filter by. Serialised on the wire as a
+   * comma-separated string (`?status=published,unpublished`); the BE
+   * validator at `articles/validator.ts` accepts both forms.
+   */
+  status?: ArticleStatus[];
   /** `'me'` resolves to the current user on the server. */
   authorId?: 'me' | string;
   page?: number;
@@ -49,9 +54,15 @@ export async function updateDraft(id: string, body: UpdateDraftInput): Promise<A
 
 /** `GET /v1/articles` — list. Defaults to mine + drafts when called bare. */
 export async function listArticles(query: ListArticlesQuery = {}): Promise<ArticlesListResult> {
-  const res = await apiClient.get<ApiSuccess<ArticlesListResult>>('/articles', {
-    params: query,
-  });
+  // Serialise multi-status as CSV so the URL stays compact and the BE
+  // validator preprocesses it back into an array. Single-status callers
+  // still work — a one-element array round-trips through `join(',')` as
+  // a single value.
+  const params: Record<string, unknown> = { ...query };
+  if (query.status?.length) {
+    params.status = query.status.join(',');
+  }
+  const res = await apiClient.get<ApiSuccess<ArticlesListResult>>('/articles', { params });
   return res.data.data;
 }
 
@@ -103,7 +114,7 @@ export async function deleteArticle(id: string): Promise<void> {
 export async function listSubmittedArticles(
   query: Omit<ListArticlesQuery, 'status'> = {},
 ): Promise<ArticlesListResult> {
-  return listArticles({ ...query, status: 'submitted' });
+  return listArticles({ ...query, status: ['submitted'] });
 }
 
 /** `POST /v1/articles/:id/approve` — fires the AI pipeline on success. */
