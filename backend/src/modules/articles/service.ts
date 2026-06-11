@@ -1379,6 +1379,28 @@ export type ArticlePdfResponse =
  * buster: any edit bumps `version`, the cache key changes, the next call
  * regenerates.
  */
+/**
+ * Best-effort fetch of the article's cover bytes for PDF embedding. Bounded
+ * by a 3 s abort + a 10 MB sanity cap; ANY failure (timeout, non-200, junk
+ * content) degrades to a coverless render rather than failing the request.
+ * The URL is our own CDN/MinIO link off the article doc — not user input.
+ */
+async function fetchCoverForPdf(url: string | null): Promise<Buffer | null> {
+  if (!url) return null;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 3_000);
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const bytes = await res.arrayBuffer();
+    if (bytes.byteLength > 10 * 1024 * 1024) return null;
+    return Buffer.from(bytes);
+  } catch {
+    return null;
+  }
+}
+
 export async function getArticlePdf(id: string): Promise<ArticlePdfResponse> {
   if (!Types.ObjectId.isValid(id)) {
     throw ApiError.notFound('Article not found');
@@ -1406,10 +1428,13 @@ export async function getArticlePdf(id: string): Promise<ArticlePdfResponse> {
     );
   }
 
-  const authors = await loadAuthorsByIds([article.authorId]);
+  const [authors, coverImage] = await Promise.all([
+    loadAuthorsByIds([article.authorId]),
+    fetchCoverForPdf(article.coverImageUrl),
+  ]);
   const authorName = authors.get(article.authorId.toString())?.name ?? null;
 
-  const buffer = await renderArticlePdf({ article, authorName });
+  const buffer = await renderArticlePdf({ article, authorName, coverImage });
 
   try {
     await putObject(key, buffer, 'application/pdf');
