@@ -6,6 +6,7 @@
  * Subphase 2+. Keep fixtures intentionally thin so they're easy to swap.
  */
 import type { Article, FeedCard, HomeFeed } from '@/types/article';
+import type { Bookmark } from '@/types/bookmark';
 import type { Comment } from '@/types/comment';
 import type { Epaper } from '@/types/epaper';
 import type { Notification } from '@/types/notification';
@@ -579,5 +580,54 @@ export const mockEpaperIssues: Epaper[] = [
     stats: { downloads: 128, views: 894 },
     createdAt: '2026-05-23T06:00:00.000Z',
     updatedAt: '2026-05-23T06:00:00.000Z',
+  },
+];
+
+/**
+ * Subphase 5 bookmarks — match the real `Bookmark` wire shape
+ * (`types/bookmark.ts`). Each row carries the compact `FeedCard` of the
+ * saved article, or `null` when the article was unpublished/removed after
+ * the user bookmarked it (rendered as the Unavailable row).
+ */
+const bookmarkedCard1: FeedCard = {
+  id: 'art_demo_001',
+  slug: 'global-higher-education-trends-2026',
+  title: 'Global Higher Education Trends in 2026',
+  subtitle: 'A look at the institutional shifts shaping universities worldwide this year.',
+  coverImageUrl: null,
+  category: 'research_innovation',
+  location: '',
+  publishedAt: '2026-05-10T09:00:00.000Z',
+  author: { id: 'usr_author_01', name: 'Ishita Mishra' },
+  ai: { summary: '', readingTimeMin: 6, degraded: false },
+  stats: { views: 0, commentsCount: 0, bookmarks: 1 },
+};
+
+const bookmarkedCard2: FeedCard = {
+  id: 'art_demo_002',
+  slug: 'inside-the-2026-engineering-rankings',
+  title: 'Inside the 2026 Engineering Rankings',
+  subtitle: 'Where Indian institutions stand against their global peers this year.',
+  coverImageUrl: null,
+  category: 'campus_news',
+  location: '',
+  publishedAt: '2026-05-08T13:30:00.000Z',
+  author: { id: 'usr_author_02', name: 'Arjun Sharma' },
+  ai: { summary: '', readingTimeMin: 8, degraded: false },
+  stats: { views: 0, commentsCount: 0, bookmarks: 1 },
+};
+
+export const mockBookmarks: Bookmark[] = [
+  {
+    id: 'bm_001',
+    articleId: bookmarkedCard1.id,
+    createdAt: '2026-06-01T10:00:00.000Z',
+    article: bookmarkedCard1,
+  },
+  {
+    id: 'bm_002',
+    articleId: bookmarkedCard2.id,
+    createdAt: '2026-05-30T14:00:00.000Z',
+    article: bookmarkedCard2,
   },
 ];
