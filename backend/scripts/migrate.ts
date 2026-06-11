@@ -15,36 +15,11 @@
  * Run with:  npx tsx scripts/migrate.ts
  * Or:        npm run migrate
  */
-import type { Model } from 'mongoose';
-
 import { loadEnv } from '../src/config/env';
 import { connectMongo, disconnectMongo } from '../src/config/db';
 import { logger } from '../src/config/logger';
 
-import { Article } from '../src/modules/articles/model';
-import { Comment } from '../src/modules/comments/model';
-import { Epaper } from '../src/modules/epaper/model';
-import { Media } from '../src/modules/media/model';
-import { Notification } from '../src/modules/notifications/model';
-import { Organisation } from '../src/modules/organisations/model';
-import { Session } from '../src/modules/auth/model';
-import { User } from '../src/modules/users/model';
-
-interface RegisteredModel {
-  readonly name: string;
-  readonly model: Model<unknown>;
-}
-
-const MODELS: RegisteredModel[] = [
-  { name: 'User', model: User as Model<unknown> },
-  { name: 'Organisation', model: Organisation as Model<unknown> },
-  { name: 'Session', model: Session as Model<unknown> },
-  { name: 'Article', model: Article as Model<unknown> },
-  { name: 'Media', model: Media as Model<unknown> },
-  { name: 'Comment', model: Comment as Model<unknown> },
-  { name: 'Notification', model: Notification as Model<unknown> },
-  { name: 'Epaper', model: Epaper as Model<unknown> },
-];
+import { MODELS, type RegisteredModel } from './_models';
 
 async function syncModel(entry: RegisteredModel): Promise<void> {
   const ops = await entry.model.syncIndexes({ background: true });

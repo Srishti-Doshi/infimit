@@ -28,6 +28,7 @@ import { ZodError } from 'zod';
 import mongoose from 'mongoose';
 import { ApiError, ErrorCode, isApiError } from '@/shared/errors';
 import { loadEnv } from '@/config/env';
+import { captureException } from '@/config/sentry';
 
 const env = loadEnv();
 
@@ -68,6 +69,15 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   // Log everything; level chosen by class of error.
   if (apiErr.statusCode >= 500) {
     log.error({ err, requestId: req.requestId, code: apiErr.code }, 'unhandled_error');
+    // Mirror 5xx to Sentry. No-op when SENTRY_DSN is unset (dev / test); in
+    // production this is the canonical bug-reporting path. 4xx are not
+    // reported — they're client-shape failures, not server bugs.
+    captureException(err, {
+      requestId: req.requestId,
+      code: apiErr.code,
+      path: req.path,
+      method: req.method,
+    });
   } else if (apiErr.statusCode >= 400) {
     log.warn(
       { err: { message: apiErr.message, code: apiErr.code }, requestId: req.requestId },
