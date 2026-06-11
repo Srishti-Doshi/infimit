@@ -116,12 +116,33 @@ const statusFilter = z
   )
   .pipe(z.array(z.enum(ARTICLE_STATUS_VALUES)).min(1).max(ARTICLE_STATUS_VALUES.length));
 
-export const listArticlesQuerySchema = z.object({
-  status: statusFilter.optional(),
-  authorId: z.union([z.literal('me'), objectIdString]).optional(),
-  page: z.coerce.number().int().positive().optional(),
-  limit: z.coerce.number().int().positive().max(100).optional(),
-});
+/**
+ * Shared query schema for `GET /v1/articles`. The route is dual-mode:
+ *   - Authenticated + (`status` OR `authorId`) → dashboard list (role-scoped)
+ *   - No auth or no dashboard params → public reader list (status=published
+ *     implicit, public reader filters apply)
+ *
+ * The controller branches on `req.user` + presence of dashboard params; the
+ * schema accepts the union so both paths share a single validation step.
+ */
+export const listArticlesQuerySchema = z
+  .object({
+    // Dashboard-only filters
+    status: statusFilter.optional(),
+    authorId: z.union([z.literal('me'), objectIdString]).optional(),
+    // Public reader filters (Subphase 5)
+    category: articleCategorySchema.optional(),
+    location: z.string().trim().min(1).max(100).optional(),
+    dateFrom: z.coerce.date().optional(),
+    dateTo: z.coerce.date().optional(),
+    // Shared pagination
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().max(100).optional(),
+  })
+  .refine((data) => !data.dateFrom || !data.dateTo || data.dateFrom <= data.dateTo, {
+    message: 'dateFrom must be on or before dateTo',
+    path: ['dateFrom'],
+  });
 export type ListArticlesQuery = z.infer<typeof listArticlesQuerySchema>;
 
 /** Path-param: 24-char hex ObjectId. */
