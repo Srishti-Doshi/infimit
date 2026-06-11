@@ -156,13 +156,50 @@ describe('GET /v1/articles/feed/home', () => {
     const feed = res.body.data.feed;
     expect(feed.trail).toHaveLength(1);
     expect(feed.trail[0].slug).toBe('trail-one');
-    expect(feed.featured).not.toBeNull();
-    expect(feed.featured.slug).toBe('featured-banner');
+    // `featured` is now an array of every flagged article, sorted by
+    // priority desc then publishedAt desc, capped at 5. The FE renders
+    // them as a carousel.
+    expect(Array.isArray(feed.featured)).toBe(true);
+    expect(feed.featured).toHaveLength(1);
+    expect(feed.featured[0].slug).toBe('featured-banner');
     expect(feed.latest.length).toBeGreaterThanOrEqual(3);
     // Trending falls back to stats.trendingScore desc when the Redis key is
     // cold — none of our seeds set a score, so order doesn't strictly matter
     // here. Just confirm the shape is present.
     expect(Array.isArray(feed.trending)).toBe(true);
+  });
+
+  it('returns every flagged featured article sorted by priority desc then publishedAt desc', async () => {
+    const author = await seedUser('author');
+    // Three featured articles with explicit priorities + publish dates so
+    // the assertions are deterministic.
+    await seedArticle({
+      title: 'mid priority',
+      slug: 'mid-priority',
+      placement: { featured: true, priority: 50 },
+      publishedAt: new Date('2026-05-05'),
+      authorId: author.id,
+    });
+    await seedArticle({
+      title: 'top priority',
+      slug: 'top-priority',
+      placement: { featured: true, priority: 90 },
+      publishedAt: new Date('2026-05-01'),
+      authorId: author.id,
+    });
+    await seedArticle({
+      title: 'low priority recent',
+      slug: 'low-priority-recent',
+      placement: { featured: true, priority: 50 },
+      publishedAt: new Date('2026-05-10'),
+      authorId: author.id,
+    });
+
+    const res = await request(app).get('/v1/articles/feed/home');
+    expect(res.status).toBe(200);
+    const slugs = res.body.data.feed.featured.map((c: { slug: string }) => c.slug);
+    // priority desc → 90 first; then ties broken by publishedAt desc.
+    expect(slugs).toEqual(['top-priority', 'low-priority-recent', 'mid-priority']);
   });
 
   it('falls back to latest 5 when no article carries placement.trail', async () => {

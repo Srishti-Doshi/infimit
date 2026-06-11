@@ -307,7 +307,13 @@ export async function listPublicByFilter(
 
 export interface HomeFeedSections {
   trail: ArticleModel[];
-  featured: ArticleModel | null;
+  /**
+   * All editorially-flagged featured articles, sorted by `placement.priority`
+   * desc then `publishedAt` desc, capped at `HOME_FEATURED_LIMIT`. The FE
+   * renders the first one as the lead hero and rotates through the rest as
+   * a carousel. Empty array when nothing is flagged.
+   */
+  featured: ArticleModel[];
   latest: ArticleModel[];
 }
 
@@ -318,10 +324,11 @@ export interface HomeFeedSections {
  *
  * Limits per docs/13-feature-documentation.md A3:
  *   - trail (placement.trail=true) → up to 8 (horizontal scroll strip)
- *   - featured (placement.featured=true, priority desc) → at most one
+ *   - featured (placement.featured=true, priority desc) → up to 5 (carousel)
  *   - latest (status=published) → 20 (FE paginates beyond)
  */
 const HOME_TRAIL_LIMIT = 8;
+const HOME_FEATURED_LIMIT = 5;
 const HOME_LATEST_LIMIT = 20;
 
 export async function findHomeFeedSections(): Promise<HomeFeedSections> {
@@ -331,8 +338,9 @@ export async function findHomeFeedSections(): Promise<HomeFeedSections> {
       .sort({ publishedAt: -1 })
       .limit(HOME_TRAIL_LIMIT)
       .exec(),
-    Article.findOne({ ...baseFilter, 'placement.featured': true })
+    Article.find({ ...baseFilter, 'placement.featured': true })
       .sort({ 'placement.priority': -1, publishedAt: -1 })
+      .limit(HOME_FEATURED_LIMIT)
       .exec(),
     Article.find(baseFilter).sort({ publishedAt: -1 }).limit(HOME_LATEST_LIMIT).exec(),
   ]);

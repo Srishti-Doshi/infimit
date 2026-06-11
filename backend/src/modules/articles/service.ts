@@ -1179,22 +1179,29 @@ const TRAIL_FALLBACK_LIMIT = 5;
 
 export interface HomeFeedPayload {
   trail: FeedCardView[];
-  featured: FeedCardView | null;
+  /**
+   * Every editorially-flagged featured article, sorted by `placement.priority`
+   * desc then `publishedAt` desc, capped at the repository's
+   * `HOME_FEATURED_LIMIT` (5). The FE renders the first one as the hero and
+   * rotates through the rest as a carousel. Empty array when nothing is
+   * flagged — the FE omits the hero block entirely.
+   */
+  featured: FeedCardView[];
   latest: FeedCardView[];
   trending: FeedCardView[];
 }
 
 /**
- * Home feed composite payload — TRAIL strip + featured banner + latest list +
- * trending list. Cached at `feed:home` for 60s via `getOrSet` (single-flight
- * to prevent cache-stampede on publish-time invalidation). Eviction is wired
- * via `publicCacheKeys` so publish/unpublish/placement-update busts it
- * automatically.
+ * Home feed composite payload — TRAIL strip + featured carousel + latest
+ * list + trending list. Cached at `feed:home` for 60s via `getOrSet`
+ * (single-flight to prevent cache-stampede on publish-time invalidation).
+ * Eviction is wired via `publicCacheKeys` so publish/unpublish/placement-
+ * update busts it automatically.
  *
  * Fallbacks per docs/13-feature-documentation.md A3:
  *   - trail empty → latest 5 (so a fresh deployment with no TRAIL flags set
  *     still renders the strip with real content)
- *   - featured missing → null (FE hides the banner block)
+ *   - featured empty → empty array (FE hides the hero block)
  *   - trending cold → handled inside `getTrendingFeed`
  */
 export async function getHomeFeed(): Promise<HomeFeedPayload> {
@@ -1213,9 +1220,7 @@ export async function getHomeFeed(): Promise<HomeFeedPayload> {
       const [trail, latest, featured] = await Promise.all([
         shapeFeedCards(trailSource),
         shapeFeedCards(sections.latest),
-        sections.featured
-          ? shapeFeedCards([sections.featured]).then((arr) => arr[0] ?? null)
-          : Promise.resolve(null),
+        shapeFeedCards(sections.featured),
       ]);
 
       return { trail, featured, latest, trending };
