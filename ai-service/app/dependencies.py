@@ -9,18 +9,12 @@ def verify_internal_key(
     if x_internal_key != settings.AI_INTERNAL_KEY:
         raise HTTPException(
             status_code=401,
-            detail="Unauthorized"
+            detail={
+            "code": "INVALID_INTERNAL_KEY",
+            "message": "Invalid internal key"
+        }
         )
 
     return True
-
-
-
-
-
-
-
-
-
 
 # An internal key prevents unauthorized users or applications from accessing an API.
