@@ -22,7 +22,10 @@ import {
   createDraft,
   getArticleById,
   getArticleBySlug,
+  getHomeFeed,
+  getTrendingFeed,
   listArticles,
+  listPublicArticles,
   publishArticle,
   regenerateSummary,
   rejectArticle,
@@ -81,25 +84,82 @@ export const getArticleHandler = asyncHandler(async (req: Request, res: Response
   res.status(200).json({ success: true, data: { article } });
 });
 
+/**
+ * `GET /v1/articles` — dual-mode list endpoint.
+ *
+ * Routing decision (in order):
+ *   1. If the query carries any public-reader filter (`category`,
+ *      `location`, `dateFrom`, `dateTo`) → PUBLIC path. Auth is ignored —
+ *      the FE's category page wants public results even when the user
+ *      happens to be logged in (the axios instance attaches Bearer to
+ *      every request by default).
+ *   2. Else if the caller is authenticated → DASHBOARD path. Preserves
+ *      the Subphase 3 behaviour where `GET /articles` returns the role-
+ *      scoped dashboard list (authors see their own; editors/admins see
+ *      broader).
+ *   3. Else → PUBLIC path with no filters (latest published, paginated).
+ *
+ * The 1-then-2-then-3 order means an authed-but-no-filter call keeps the
+ * dashboard shape it had before Subphase 5, AND an unauthed-with-filter
+ * call gets the public shape S5 needs.
+ */
 export const listArticlesHandler = asyncHandler(async (req: Request, res: Response) => {
-  if (!req.user) throw ApiError.unauthorized();
   const query = req.query as ListArticlesQuery;
-  const result = await listArticles({
-    status: query.status,
-    authorId: query.authorId,
+  const hasPublicFilter =
+    query.category !== undefined ||
+    query.location !== undefined ||
+    query.dateFrom !== undefined ||
+    query.dateTo !== undefined;
+
+  if (!hasPublicFilter && req.user) {
+    const result = await listArticles({
+      status: query.status,
+      authorId: query.authorId,
+      page: query.page,
+      limit: query.limit,
+      viewer: { id: req.user.id, role: req.user.role },
+    });
+    res.status(200).json({
+      success: true,
+      data: {
+        items: result.items,
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+      },
+    });
+    return;
+  }
+
+  const publicResult = await listPublicArticles({
+    category: query.category,
+    location: query.location,
+    dateFrom: query.dateFrom,
+    dateTo: query.dateTo,
     page: query.page,
     limit: query.limit,
-    viewer: { id: req.user.id, role: req.user.role },
   });
   res.status(200).json({
     success: true,
     data: {
-      items: result.items,
-      total: result.total,
-      page: result.page,
-      limit: result.limit,
+      items: publicResult.items,
+      total: publicResult.total,
+      page: publicResult.page,
+      limit: publicResult.limit,
     },
   });
+});
+
+// ─── Subphase 5 — public reader feeds ───────────────────────────────────
+
+export const getHomeFeedHandler = asyncHandler(async (_req: Request, res: Response) => {
+  const feed = await getHomeFeed();
+  res.status(200).json({ success: true, data: { feed } });
+});
+
+export const getTrendingFeedHandler = asyncHandler(async (_req: Request, res: Response) => {
+  const items = await getTrendingFeed();
+  res.status(200).json({ success: true, data: { items } });
 });
 
 export const submitArticleHandler = asyncHandler(async (req: Request, res: Response) => {

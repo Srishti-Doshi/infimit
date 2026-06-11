@@ -254,3 +254,130 @@ export async function setPlacementWithVersion(
     { new: true },
   ).exec();
 }
+
+// ═══ Subphase 5 — public reader queries ═════════════════════════════════
+//
+// All `published`-status reads with `deletedAt:null`. No RBAC at this layer —
+// these are the public reader surface. Sorted `publishedAt desc` for the
+// usual "newest first" reader expectation; trending uses `stats.trendingScore`
+// as the primary sort key.
+
+export interface PublicListFilter {
+  category?: ArticleDocument['category'];
+  location?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+}
+
+/**
+ * Public reader list: published-only articles matching the optional filters.
+ * Backs `GET /v1/articles?category=...&location=...&dateFrom=...&dateTo=...`
+ * per docs/05-api-documentation.md §5.5 + docs/13-feature-documentation.md A1.
+ *
+ * Index plan: `category_publishedAt` and `location_publishedAt` cover the
+ * common per-section reader sweeps; `status_publishedAt` covers the
+ * unfiltered case. Date-range filtering composes onto the `publishedAt` key
+ * of whichever compound index gets selected.
+ */
+export async function listPublicByFilter(
+  filter: PublicListFilter,
+  options: ListArticlesOptions = {},
+): Promise<{ items: ArticleModel[]; total: number }> {
+  const page = Math.max(1, options.page ?? 1);
+  const limit = Math.max(1, Math.min(100, options.limit ?? 20));
+  const skip = (page - 1) * limit;
+
+  const query: FilterQuery<ArticleDocument> = { status: 'published', deletedAt: null };
+  if (filter.category) query.category = filter.category;
+  if (filter.location) query.location = filter.location;
+  if (filter.dateFrom || filter.dateTo) {
+    const dateRange: Record<string, Date> = {};
+    if (filter.dateFrom) dateRange.$gte = filter.dateFrom;
+    if (filter.dateTo) dateRange.$lte = filter.dateTo;
+    query.publishedAt = dateRange;
+  }
+
+  const [items, total] = await Promise.all([
+    Article.find(query).sort({ publishedAt: -1 }).skip(skip).limit(limit).exec(),
+    Article.countDocuments(query).exec(),
+  ]);
+
+  return { items, total };
+}
+
+export interface HomeFeedSections {
+  trail: ArticleModel[];
+  featured: ArticleModel | null;
+  latest: ArticleModel[];
+}
+
+/**
+ * Home-feed slices in one Promise.all — three independent indexed queries.
+ * The service composes these with the trending feed into the composite
+ * `feed:home` cache payload.
+ *
+ * Limits per docs/13-feature-documentation.md A3:
+ *   - trail (placement.trail=true) → up to 8 (horizontal scroll strip)
+ *   - featured (placement.featured=true, priority desc) → at most one
+ *   - latest (status=published) → 20 (FE paginates beyond)
+ */
+const HOME_TRAIL_LIMIT = 8;
+const HOME_LATEST_LIMIT = 20;
+
+export async function findHomeFeedSections(): Promise<HomeFeedSections> {
+  const baseFilter = { status: 'published' as const, deletedAt: null };
+  const [trail, featured, latest] = await Promise.all([
+    Article.find({ ...baseFilter, 'placement.trail': true })
+      .sort({ publishedAt: -1 })
+      .limit(HOME_TRAIL_LIMIT)
+      .exec(),
+    Article.findOne({ ...baseFilter, 'placement.featured': true })
+      .sort({ 'placement.priority': -1, publishedAt: -1 })
+      .exec(),
+    Article.find(baseFilter).sort({ publishedAt: -1 }).limit(HOME_LATEST_LIMIT).exec(),
+  ]);
+  return { trail, featured, latest };
+}
+
+/**
+ * Fallback for the trending feed when the `feed:trending` Redis key is cold
+ * (cron hasn't populated it yet, or in a fresh test env). Sorts by the
+ * denormalised `stats.trendingScore` (written by the 5-d cron) with
+ * `publishedAt desc` as a tiebreaker so brand-new articles aren't pinned
+ * to the bottom forever.
+ */
+export async function findTrendingFallback(limit: number): Promise<ArticleModel[]> {
+  return Article.find({ status: 'published', deletedAt: null })
+    .sort({ 'stats.trendingScore': -1, publishedAt: -1 })
+    .limit(limit)
+    .exec();
+}
+
+/**
+ * Hydrate a list of article IDs into published `ArticleModel` docs, preserving
+ * the input order. Filters out IDs that don't resolve to a published, non-
+ * soft-deleted article (e.g. a previously-trending article that's since been
+ * unpublished — drop it rather than show a 404'ing card).
+ *
+ * Used by the trending feed to materialise the cached `feed:trending` ID list
+ * the cron writes.
+ */
+export async function findByIdsPreservingOrder(
+  ids: ReadonlyArray<string>,
+): Promise<ArticleModel[]> {
+  if (ids.length === 0) return [];
+  const valid = ids.filter((id) => /^[0-9a-fA-F]{24}$/.test(id));
+  if (valid.length === 0) return [];
+  const docs = await Article.find({
+    _id: { $in: valid },
+    status: 'published',
+    deletedAt: null,
+  }).exec();
+  const byId = new Map(docs.map((d) => [d._id.toString(), d]));
+  const out: ArticleModel[] = [];
+  for (const id of ids) {
+    const doc = byId.get(id);
+    if (doc) out.push(doc);
+  }
+  return out;
+}

@@ -5,6 +5,7 @@ export { notFound } from './notFound';
 export { validate, type ValidationSchemas } from './validate';
 export { authLimiter, buildLimiter, commentLimiter, globalLimiter } from './rateLimit';
 export { requireAuth } from './authGuard';
+export { optionalAuth } from './optionalAuth';
 export { requireRole } from './roleGuard';
 export { requireInternalKey } from './internalKey';
 export { corsMiddleware } from './cors';

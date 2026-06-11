@@ -36,6 +36,7 @@ import { aiProxy } from '@/modules/ai-proxy';
 import { mediaRepo } from '@/modules/media';
 import { usersRepo } from '@/modules/users';
 import { logger } from '@/config/logger';
+import { getRedis } from '@/config/redis';
 
 import { articleEvents } from './events';
 import type { ArticleModel, ArticleStatus } from './model';
@@ -1103,4 +1104,222 @@ export async function getArticleBySlug(slug: string): Promise<PublicArticleView>
       author: authors.get(article.authorId.toString()) ?? null,
     } as PublicArticleView;
   });
+}
+
+// ═══ Subphase 5 — reader feeds + public list ════════════════════════════
+//
+// Public reader surface: home composite, trending, and the filtered list. No
+// auth required; status=published is implicit. Responses use the compact
+// `FeedCardView` shape — no body, no plainText, no internal AI/embedding
+// fields — so payload sizes stay reader-friendly (~200-500 B per card vs
+// 5-20 KB for a full article doc).
+
+export interface FeedCardView {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string;
+  coverImageUrl: string | null;
+  category: ArticleCategory;
+  location: string;
+  publishedAt: Date | null;
+  author: AuthorView | null;
+  ai: {
+    summary: string;
+    readingTimeMin: number;
+    degraded: boolean;
+  };
+  stats: {
+    views: number;
+    commentsCount: number;
+    bookmarks: number;
+  };
+}
+
+/**
+ * View-shape a single article into the reader-feed card. Drops body,
+ * plainText, internal AI fields (keywords, embedding, model name), version,
+ * timestamps other than `publishedAt`, and `media[]`. The FE hydrates
+ * embedded media when the user opens the full article.
+ */
+function toFeedCard(article: ArticleModel, author: AuthorView | null): FeedCardView {
+  return {
+    id: article._id.toString(),
+    slug: article.slug,
+    title: article.title,
+    subtitle: article.subtitle ?? '',
+    coverImageUrl: article.coverImageUrl,
+    category: article.category,
+    location: article.location ?? '',
+    publishedAt: article.publishedAt,
+    author,
+    ai: {
+      summary: article.ai?.summary ?? '',
+      readingTimeMin: article.ai?.readingTimeMin ?? 0,
+      degraded: article.ai?.degraded ?? false,
+    },
+    stats: {
+      views: article.stats?.views ?? 0,
+      commentsCount: article.stats?.commentsCount ?? 0,
+      bookmarks: article.stats?.bookmarks ?? 0,
+    },
+  };
+}
+
+async function shapeFeedCards(articles: ReadonlyArray<ArticleModel>): Promise<FeedCardView[]> {
+  if (articles.length === 0) return [];
+  const authors = await loadAuthorsByIds(articles.map((a) => a.authorId));
+  return articles.map((a) => toFeedCard(a, authors.get(a.authorId.toString()) ?? null));
+}
+
+const TRENDING_LIMIT = 10;
+const TRAIL_FALLBACK_LIMIT = 5;
+
+export interface HomeFeedPayload {
+  trail: FeedCardView[];
+  featured: FeedCardView | null;
+  latest: FeedCardView[];
+  trending: FeedCardView[];
+}
+
+/**
+ * Home feed composite payload — TRAIL strip + featured banner + latest list +
+ * trending list. Cached at `feed:home` for 60s via `getOrSet` (single-flight
+ * to prevent cache-stampede on publish-time invalidation). Eviction is wired
+ * via `publicCacheKeys` so publish/unpublish/placement-update busts it
+ * automatically.
+ *
+ * Fallbacks per docs/13-feature-documentation.md A3:
+ *   - trail empty → latest 5 (so a fresh deployment with no TRAIL flags set
+ *     still renders the strip with real content)
+ *   - featured missing → null (FE hides the banner block)
+ *   - trending cold → handled inside `getTrendingFeed`
+ */
+export async function getHomeFeed(): Promise<HomeFeedPayload> {
+  return cache.getOrSet<HomeFeedPayload>(
+    cache.cacheKeys.feedHome(),
+    cache.CACHE_TTL.feedHome,
+    async () => {
+      const [sections, trending] = await Promise.all([
+        articlesRepo.findHomeFeedSections(),
+        getTrendingFeed(),
+      ]);
+
+      const trailSource =
+        sections.trail.length > 0 ? sections.trail : sections.latest.slice(0, TRAIL_FALLBACK_LIMIT);
+
+      const [trail, latest, featured] = await Promise.all([
+        shapeFeedCards(trailSource),
+        shapeFeedCards(sections.latest),
+        sections.featured
+          ? shapeFeedCards([sections.featured]).then((arr) => arr[0] ?? null)
+          : Promise.resolve(null),
+      ]);
+
+      return { trail, featured, latest, trending };
+    },
+  );
+}
+
+/**
+ * Trending feed: hydrates the article IDs stored in the `feed:trending`
+ * Redis key (written by the 5-d trending cron every 5 min). When the key is
+ * cold or malformed, falls back to a fresh query over `stats.trendingScore`
+ * (denorm written by the same cron, so the fallback degrades gracefully even
+ * if Redis goes away).
+ *
+ * NOT wrapped in `getOrSet` — the source of truth IS the Redis key. Wrapping
+ * would double-cache and complicate eviction when the cron writes a new
+ * snapshot. Hydration on every request is fine for P1 (one indexed `$in`
+ * query at most).
+ */
+export async function getTrendingFeed(): Promise<FeedCardView[]> {
+  const redis = getRedis();
+  let articles: ArticleModel[] = [];
+
+  try {
+    const raw = await redis.get(cache.cacheKeys.feedTrending());
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed) && parsed.every((v): v is string => typeof v === 'string')) {
+        articles = await articlesRepo.findByIdsPreservingOrder(parsed.slice(0, TRENDING_LIMIT));
+      }
+    }
+  } catch (err) {
+    logger.warn({ err }, 'trending_cache_read_failed');
+  }
+
+  if (articles.length === 0) {
+    // Cold-cache fallback per docs/13-feature-documentation.md A3.
+    logger.warn('feed_trending_cold_fallback');
+    articles = await articlesRepo.findTrendingFallback(TRENDING_LIMIT);
+  }
+
+  return shapeFeedCards(articles);
+}
+
+export interface PublicListInput {
+  category?: ArticleCategory;
+  location?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  page?: number;
+  limit?: number;
+}
+
+export interface PublicListResult {
+  items: FeedCardView[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/**
+ * Public reader list — paginated published articles with optional
+ * category/location/dateRange filters. Default page=1, limit=20 (max 100).
+ *
+ * Cache key strategy: only the "simplest" category-only first-page case
+ * goes through the `feed:category:<slug>` cache. Combined-filter pages
+ * (location, date ranges, beyond page 1) skip the cache to avoid an
+ * unbounded key space. Most reader traffic hits the category landing page
+ * with no further filters — that's the case we optimise.
+ */
+export async function listPublicArticles(input: PublicListInput): Promise<PublicListResult> {
+  const page = Math.max(1, input.page ?? 1);
+  const limit = Math.max(1, Math.min(100, input.limit ?? 20));
+
+  const cacheable =
+    page === 1 &&
+    limit === 20 &&
+    input.category !== undefined &&
+    input.location === undefined &&
+    input.dateFrom === undefined &&
+    input.dateTo === undefined;
+
+  if (cacheable && input.category) {
+    return cache.getOrSet<PublicListResult>(
+      cache.cacheKeys.feedCategory(input.category),
+      cache.CACHE_TTL.feedCategory,
+      () => fetchPublicList(input, page, limit),
+    );
+  }
+  return fetchPublicList(input, page, limit);
+}
+
+async function fetchPublicList(
+  input: PublicListInput,
+  page: number,
+  limit: number,
+): Promise<PublicListResult> {
+  const { items, total } = await articlesRepo.listPublicByFilter(
+    {
+      category: input.category,
+      location: input.location,
+      dateFrom: input.dateFrom,
+      dateTo: input.dateTo,
+    },
+    { page, limit },
+  );
+  const cards = await shapeFeedCards(items);
+  return { items: cards, total, page, limit };
 }
