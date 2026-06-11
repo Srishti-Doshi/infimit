@@ -15,7 +15,6 @@ from app.middleware.rate_limiter import is_rate_limited
 
 router = APIRouter()
 
-
 @router.post("/summarize", response_model=SummarizeResponse)
 def summarize(
     data: SummarizeRequest,
@@ -24,9 +23,6 @@ def summarize(
 ):
     client_ip = request.client.host
 
-    # -------------------------
-    # RATE LIMITING
-    # -------------------------
     if is_rate_limited(client_ip):
         raise HTTPException(
             status_code=429,
@@ -36,33 +32,21 @@ def summarize(
     start_time = time.time()
     increment_total_requests()
 
-    # -------------------------
-    # INPUT VALIDATION
-    # -------------------------
-    if not data.text.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Text cannot be empty"
-        )
-
     try:
-        # -------------------------
-        # CALL SERVICE LAYER
-        # -------------------------
         result = summarize_text(
             text=data.text,
-            max_words=data.maxWords,   # IMPORTANT FIX
+            max_words=data.maxWords,
             style=data.style
         )
 
         increment_successful_requests()
 
-        # logging
-        log_request(data.text, start_time, "SUCCESS")
+        log_request(
+            data.text,
+            start_time,
+            "SUCCESS"
+        )
 
-        # -------------------------
-        # RESPONSE MAPPING (IMPORTANT FIX)
-        # -------------------------
         return {
             "summary": result,
             "confidence": 0.9,
@@ -74,7 +58,12 @@ def summarize(
 
     except Exception as e:
         increment_failed_requests()
-        log_request(data.text, start_time, "FAILED")
+
+        log_request(
+            data.text,
+            start_time,
+            "FAILED"
+        )
 
         raise HTTPException(
             status_code=500,
