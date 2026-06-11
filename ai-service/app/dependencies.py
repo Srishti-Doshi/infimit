@@ -23,12 +23,4 @@ def verify_internal_key(
 
 
 
-
-
-
-
-
-
-
-
 # An internal key prevents unauthorized users or applications from accessing an API.

@@ -5,7 +5,7 @@ from app.main import app
 
 client = TestClient(app)
 
-# 👉 Change this if your env key is different
+#  Change this if your env key is different
 VALID_KEY = "test_key"
 INVALID_KEY = "wrong_key"
 
@@ -72,7 +72,12 @@ def test_summarize_success():
     )
 
     assert response.status_code == 200
+
     data = response.json()
 
     assert "summary" in data
-    assert data["success"] is True
+    assert "confidence" in data
+    assert "model" in data
+    assert "tokensIn" in data
+    assert "tokensOut" in data
+    assert "cached" in data

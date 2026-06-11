@@ -3,125 +3,124 @@ from app.utils.cache import get_cache, set_cache
 import logging
 import hashlib
 
- 
-
 logger = logging.getLogger(__name__)
 
-def summarize_text(text: str):
+
+def summarize_text(text: str, max_words: int = 120, style: str = "default"):
     try:
-        # 1. CREATE CACHE KEY (FIRST LINE)
+        # -------------------------
+        # 1. CACHE KEY
+        # -------------------------
         cache_key = "summarize:" + hashlib.md5(text.encode()).hexdigest()
 
-        # 2. CHECK CACHE
         cached_result = get_cache(cache_key)
 
+        # Always return cached value if valid
         if isinstance(cached_result, str) and cached_result.strip():
             return cached_result
 
-        # 3. LOAD CLIENT
+        # -------------------------
+        # 2. LOAD MODEL CLIENT
+        # -------------------------
         client = get_groq_client()
-        # Count words
+
         word_count = len(text.split())
 
-        # Decide processing type
+        # -------------------------
+        # 3. SYSTEM PROMPTS (UPDATED)
+        # -------------------------
+
+        # SHORT ARTICLE
         if word_count < 300:
 
             system_prompt = """
-You are a senior editor for a professional education news platform.
+You are an expert news editor for a newspaper-style education news platform.
 
-Task:
-Improve the article's readability, formatting, paragraph structure, and journalistic style.
+TASK:
+Convert the given article into a QUICK READ SUMMARY IN POINTS.
 
-Rules:
-- Preserve all information.
-- Do not remove important details.
-- Do not shorten the article significantly.
-- Correct grammar and readability issues if necessary.
-- Organize content into logical paragraphs.
-- Use professional news-writing style.
-- Output only the improved article.
+REQUIREMENTS:
+- Output ONLY bullet points (no paragraphs)
+- Each point must be short and clear
+- Preserve all important facts
+- No extra commentary
+- Focus on who, what, when, where, why
+- Make it fast to read (designed for busy users)
+- Use simple English
+
+FORMAT:
+• Point 1
+• Point 2
+• Point 3
 """
 
-        elif word_count <=1500:
+        # MEDIUM ARTICLE
+        elif word_count <= 1500:
 
             system_prompt = """
- You are a senior editor for a professional education news platform.
+You are a senior editor for a professional education news platform.
 
-Your task is to create accurate, professional, and publication-ready summaries of education-related news articles.
+TASK:
+Convert the article into a structured POINT-WISE NEWS SUMMARY.
 
-Guidelines:
- 
-article must be at least 600 words and maximum 800 words.
+REQUIREMENTS:
+- Output only bullet points
+- Each point should represent one key idea
+- Preserve all important facts, names, dates, numbers
+- Focus on education-related updates (schools, colleges, exams, scholarships, etc.)
+- No repetition
+- Keep language simple and news-friendly
+- Make it easy to scan quickly like a newspaper highlights section
 
-Preserve all important facts, figures, dates, names, and announcements.
-Never add information that is not present in the original article.
-Use a neutral and professional journalistic tone.
-Focus on the most important developments and outcomes.
-Prioritize information related to students, teachers, schools, colleges, universities, hackathon,seminars,workshops,examinations, admissions, scholarships, research, academic achievements, educational policies, institutional initiatives, and sports achievements.
-Do not remove critical information simply to make the summary shorter.
-Adjust the summary length dynamically based on the importance and density of information.
-If the article contains important dates, deadlines, eligibility criteria, examination details, admission information, scholarship information, or official announcements, ensure they are retained in the summary.
-Use clear and simple English suitable for a broad audience.
-Avoid repetition.
-Produce a summary that can be directly published on a professional news website.
-
-Formatting Rules:
-
-Organize information into logical paragraphs.
-Insert paragraph breaks naturally when the topic or idea changes.
-Avoid large blocks of text.
-Ensure readability on both mobile and desktop devices.
-Allow paragraph length to vary naturally according to the content.
-
-Summary Length Rules:
-
-
-
-Output only the summary.
- 
+FORMAT:
+• Key point 1
+• Key point 2
+• Key point 3
 """
 
+        # LONG ARTICLE
         else:
 
             system_prompt = """
-You are a senior editor for a professional education news platform.
+You are a senior news editor for an education news platform.
 
-Task:
-Create a detailed professional summary.
+TASK:
+Create a detailed but SCANNABLE SUMMARY IN POINTS.
 
-Polish article
-    maximum 2000 words in article
-    Remove repetition
-    Remove unnecessary details
-    Improve readability
-    Keep all important information
-    Reduce length to a maximum of 1500 words
-    Output only the summary.
+REQUIREMENTS:
+- Convert article into structured bullet points
+- Reduce length but preserve all key information
+- Keep important facts, numbers, deadlines, announcements
+- Remove repetition and unnecessary details
+- Make it suitable for fast reading in a news app
+
+FORMAT:
+• Important point 1
+• Important point 2
+• Important point 3
 """
 
+        # -------------------------
+        # 4. MODEL CALL
+        # -------------------------
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             temperature=0.2,
             messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt
-                },
-                {
-                    "role": "user",
-                    "content": text
-                }
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text}
             ]
         )
 
         result = response.choices[0].message.content
-        
+
+        # -------------------------
+        # 5. CACHE RESULT
+        # -------------------------
         set_cache(cache_key, result, ttl=3600)
 
-        return result   
+        return result
 
     except Exception as e:
-        logger.exception(e)
-        raise Exception(str(e))
-
-
+        logger.exception("Summarization failed: %s", str(e))
+        raise Exception(f"Summarization error: {str(e)}")

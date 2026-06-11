@@ -8,16 +8,16 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         public_paths = [
             "/docs",
-            "/openapi.json",
-            "/favicon.ico",
-            "/v1/health"
+           "/openapi.json",
+            "/v1/healthz",
+            "/v1/readyz"
         ]
 
         if request.url.path in public_paths:
             return await call_next(request)
+        
 
-
-        auth_header = request.headers.get("Authorization")
+        auth_header = request.headers.get("X-Internal-Key")
 
         if not auth_header:
             return JSONResponse(
@@ -25,5 +25,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Authorization token required"}
             )
 
-        response = await call_next(request)
-        return response
+        return await call_next(request)
+
+
+         

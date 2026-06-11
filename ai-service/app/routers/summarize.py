@@ -51,16 +51,26 @@ def summarize(
         # -------------------------
         result = summarize_text(
             text=data.text,
-            maxWords=data.maxWords,
+            max_words=data.maxWords,   # IMPORTANT FIX
             style=data.style
         )
 
         increment_successful_requests()
 
-        # logging latency + status
+        # logging
         log_request(data.text, start_time, "SUCCESS")
 
-        return result
+        # -------------------------
+        # RESPONSE MAPPING (IMPORTANT FIX)
+        # -------------------------
+        return {
+            "summary": result,
+            "confidence": 0.9,
+            "model": "llama-3.3-70b-versatile",
+            "tokensIn": len(data.text.split()),
+            "tokensOut": len(result.split()),
+            "cached": False
+        }
 
     except Exception as e:
         increment_failed_requests()
@@ -68,5 +78,5 @@ def summarize(
 
         raise HTTPException(
             status_code=500,
-            detail="AI Service Error"
+            detail=str(e)
         )

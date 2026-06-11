@@ -1,9 +1,12 @@
-from pydantic import BaseModel,Field
- 
+from pydantic import BaseModel, Field
+from typing import Optional
+
+
 class SummarizeRequest(BaseModel):
     text: str
-    maxWords: int
-    style: str
+    maxWords: Optional[int] = 120
+    style: Optional[str] = "default"
+
 
 class SummarizeResponse(BaseModel):
     summary: str
@@ -12,9 +15,3 @@ class SummarizeResponse(BaseModel):
     tokensIn: int
     tokensOut: int
     cached: bool
-    
-    
-   
-
-
-#validates incoming request body
