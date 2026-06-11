@@ -29,7 +29,7 @@ By leveraging the **MERN Stack**, we are building a scalable platform that deliv
 
 ---
 
-## echnology Stack
+## Technology Stack
 
 - **Frontend:** React.js
 - **Backend:** Node.js & Express.js  
