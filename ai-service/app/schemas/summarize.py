@@ -1,7 +1,18 @@
 from pydantic import BaseModel,Field
  
-class SummaryRequest(BaseModel):
-    text: str = Field(...,min_length=10, max_length=500000,  description="Text to summarize using AI")
+class SummarizeRequest(BaseModel):
+    text: str
+    maxWords: int
+    style: str
+
+class SummarizeResponse(BaseModel):
+    summary: str
+    confidence: float
+    model: str
+    tokensIn: int
+    tokensOut: int
+    cached: bool
+    
     
    
 
