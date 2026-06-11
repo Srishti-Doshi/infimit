@@ -170,7 +170,7 @@ export default function NewEpaperPage(): JSX.Element {
               <MediaUploader
                 purpose="epaper_cover"
                 label="Cover image"
-                helperText="JPEG or PNG up to 10 MB."
+                helperText="Portrait 3:4, ideally 1200×1600 px · JPG/PNG/WebP · under 2 MB"
                 value={coverMedia}
                 onComplete={(media) => setCoverMedia(media)}
                 onRemove={() => setCoverMedia(null)}

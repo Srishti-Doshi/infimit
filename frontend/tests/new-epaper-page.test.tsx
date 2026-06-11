@@ -56,7 +56,7 @@ describe('<NewEpaperPage>', () => {
     // "Cover image" / "PDF file" strings appear in multiple slots
     // (visible label + aria attributes inside the uploader).
     expect(screen.getByText(/pdf up to 50 mb/i)).toBeInTheDocument();
-    expect(screen.getByText(/jpeg or png up to 10 mb/i)).toBeInTheDocument();
+    expect(screen.getByText(/portrait 3:4.*1200×1600/i)).toBeInTheDocument();
   });
 
   it('keeps Publish disabled until title + date + both media docs are present', async () => {
