@@ -899,6 +899,13 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
+  // ── Analytics ──────────────────────────────────────────────────────────
+  //
+  // Fire-and-forget tracker: the real BE acks 204 before persisting, accepts
+  // both anonymous (sessionId) and authed requests, and never errors a
+  // reader flow. The mock mirrors that: always 204, no validation.
+  http.post(`${BASE}/analytics/track`, () => new HttpResponse(null, { status: 204 })),
+
   // ── Bookmarks ──────────────────────────────────────────────────────────
   //
   // Real backend scopes by `req.user.id`; mock always operates on the seeded

@@ -20,6 +20,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { trackEvent } from './analytics-api';
 import {
   addBookmark,
   listBookmarks,
@@ -69,8 +70,14 @@ export function useBookmark(articleId: string): UseBookmarkReturn {
 
   const toggle = useMutation<void, unknown, void, OptimisticCtx>({
     mutationFn: async () => {
-      if (isBookmarked) await removeBookmark(articleId);
-      else await addBookmark(articleId);
+      if (isBookmarked) {
+        await removeBookmark(articleId);
+      } else {
+        await addBookmark(articleId);
+        // Emit only on a successful add — un-bookmarking isn't a `bookmark`
+        // event, and the BE counts adds for the trending score (5-fe-1).
+        void trackEvent({ type: 'bookmark', articleId });
+      }
     },
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: LIST_KEY });
