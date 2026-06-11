@@ -3,7 +3,6 @@ import { http, HttpResponse } from 'msw';
 import type { Epaper } from '@/types/epaper';
 
 import {
-  mockArticleSummaries,
   mockCategories,
   mockComments,
   mockDrafts,
@@ -340,6 +339,25 @@ export const handlers = [
     const url = new URL(request.url);
     const status = url.searchParams.get('status');
     const authorIdParam = url.searchParams.get('authorId');
+    const category = url.searchParams.get('category');
+    const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+    const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit') ?? '20')));
+
+    // Public reader path (Sub-PR 5-fb category page): when the query carries
+    // a `category` filter and no dashboard params, return published-only
+    // matches. Backend's dual-mode endpoint picks this path when the FE
+    // axios instance happens to send a Bearer.
+    if (category && !status && !authorIdParam) {
+      const matches = mockDraftsState.filter(
+        (d) => d.category === category && d.status === 'published',
+      );
+      const start = (page - 1) * limit;
+      const items = matches.slice(start, start + limit);
+      return ok({ items, total: matches.length, page, limit });
+    }
+
+    // Dashboard list path — Subphase 3 behaviour. Authenticated callers
+    // (status / authorId in the query) get the role-scoped list.
     // `'me'` mirrors the real backend, which resolves it to the bearer's
     // user id. In MSW we map it to the seeded mockUser. When no authorId
     // is passed (e.g. the editor approval queue), the list is unscoped so
@@ -757,11 +775,25 @@ export const handlers = [
   // ── Search ──────────────────────────────────────────────────────────────
   http.get(`${BASE}/search`, ({ request }) => {
     const url = new URL(request.url);
-    const q = url.searchParams.get('q') ?? '';
-    const results = q
-      ? mockArticleSummaries.filter((a) => a.title.toLowerCase().includes(q.toLowerCase()))
+    const q = (url.searchParams.get('q') ?? '').toLowerCase();
+    const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+    const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit') ?? '20')));
+    // Filter against published articles only (mirrors BE searchText filter)
+    // by title, subtitle, plainText, or tags. Sub-PR 5-fb consumer (search
+    // page) expects `data: { items, total, page, limit }` with Article-shape
+    // items.
+    const matches = q
+      ? mockDraftsState.filter((d) => {
+          if (d.status !== 'published') return false;
+          const haystack = [d.title, d.subtitle ?? '', d.plainText ?? '', ...(d.tags ?? [])]
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(q);
+        })
       : [];
-    return ok(results, { page: 1, limit: 20, total: results.length });
+    const start = (page - 1) * limit;
+    const items = matches.slice(start, start + limit);
+    return ok({ items, total: matches.length, page, limit });
   }),
 
   // ── E-paper ────────────────────────────────────────────────────────────
