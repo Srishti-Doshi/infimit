@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 
+import { Seo } from '@/components/seo';
 import { Container } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FeedCardRow, FEED_CATEGORY_LABEL } from '@/components/feed-card-row';
@@ -80,6 +81,7 @@ export default function CategoryPage(): JSX.Element {
 
   return (
     <Container width="wide" className="py-8">
+      <Seo title={label} description={`Latest reporting and analysis in ${label}.`} />
       <CategoryHeader label={label} description={`Latest reporting and analysis in ${label}.`} />
       {isError ? (
         <ErrorState onRetry={() => void refetch()} />

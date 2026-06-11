@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, type RenderOptions, type RenderResult } from '@testing-library/react';
 import { type ReactElement } from 'react';
+import { HelmetProvider } from 'react-helmet-async';
 import { MemoryRouter } from 'react-router-dom';
 
 interface RenderWithProvidersOptions extends Omit<RenderOptions, 'wrapper'> {
@@ -32,14 +33,16 @@ export function renderWithProviders(
 ): RenderResult & { queryClient: QueryClient } {
   function Wrapper({ children }: { children: React.ReactNode }): JSX.Element {
     return (
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter
-          initialEntries={initialEntries}
-          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-        >
-          {children}
-        </MemoryRouter>
-      </QueryClientProvider>
+      <HelmetProvider>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter
+            initialEntries={initialEntries}
+            future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          >
+            {children}
+          </MemoryRouter>
+        </QueryClientProvider>
+      </HelmetProvider>
     );
   }
 

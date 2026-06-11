@@ -15,6 +15,7 @@ import { useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 
+import { Seo } from '@/components/seo';
 import { Container } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FeedCardRow } from '@/components/feed-card-row';
@@ -47,6 +48,10 @@ export default function SearchPage(): JSX.Element {
 
   return (
     <Container width="wide" className="py-8">
+      <Seo
+        title={q ? `Search: ${q}` : 'Search'}
+        description="Search published articles by title, keyword, or tag."
+      />
       <header className="mb-6 border-b-2 border-brand-red-500 pb-4">
         <p className="text-body-xs font-semibold uppercase tracking-widest text-brand-red-500">
           Search

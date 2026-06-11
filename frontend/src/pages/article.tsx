@@ -7,6 +7,7 @@ import { BookmarkButton } from '@/components/bookmark-button';
 import { DownloadPdfButton } from '@/components/download-pdf-button';
 import { CommentThread } from '@/components/editor/comment-thread';
 import { SanitizedHtml } from '@/components/sanitized-html';
+import { Seo } from '@/components/seo';
 import { SocialShare } from '@/components/social-share';
 import { Button, Card, CardBody, Container, EmptyState, Skeleton } from '@/components/ui';
 import { getArticleBySlug } from '@/lib/articles-api';
@@ -85,8 +86,30 @@ export default function ArticlePage(): JSX.Element {
 
   const aiSummary = article.ai?.summary?.trim();
 
+  // schema.org Article — the JSON-LD payload search engines read for rich
+  // results. Description prefers the AI summary (concise, editor-reviewed)
+  // over the subtitle.
+  const seoDescription = aiSummary || article.subtitle || article.title;
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: article.title,
+    ...(article.publishedAt ? { datePublished: article.publishedAt } : {}),
+    author: { '@type': 'Person', name: article.author?.name ?? 'The Infimit' },
+    publisher: { '@type': 'Organization', name: 'The Infimit' },
+    ...(article.coverImageUrl ? { image: article.coverImageUrl } : {}),
+    description: seoDescription,
+  };
+
   return (
     <Container width="default" className="py-12">
+      <Seo
+        title={article.title}
+        description={seoDescription}
+        image={article.coverImageUrl ?? null}
+        type="article"
+        jsonLd={jsonLd}
+      />
       {/* ─── Header ──────────────────────────────────────────────────── */}
       <header>
         <p className="text-body-xs font-medium uppercase tracking-wide text-brand-red-600">
