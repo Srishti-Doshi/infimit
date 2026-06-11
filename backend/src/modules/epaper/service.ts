@@ -21,13 +21,55 @@ import { auditLog } from '@/shared/audit';
 import { ApiError } from '@/shared/errors';
 import { presignDownload } from '@/config/s3';
 import { logger } from '@/config/logger';
-import { mediaRepo } from '@/modules/media';
+import { mediaRepo, type MediaModel } from '@/modules/media';
 import type { UserRole } from '@/modules/users';
 
 import * as epaperRepo from './repository';
 import type { EpaperModel } from './model';
 
 const DOWNLOAD_URL_TTL_SEC = 300; // 5 minutes — short enough to limit hot-linking, long enough for the FE to redirect cleanly
+
+/**
+ * Wire shape returned to controllers. Mirrors `EpaperDocument.toJSON()` (with
+ * `id` instead of `_id`) plus the resolved cover image URL. Readers expect a
+ * cover thumbnail on the archive grid — resolving `coverMediaId` on the
+ * server avoids an N+1 round-trip from the FE.
+ *
+ * `coverImageUrl` is `null` (not undefined) when the linked Media doc is
+ * missing — surfaced cleanly to the FE so it can render the fallback icon.
+ */
+export interface EpaperResponse {
+  id: string;
+  title: string;
+  issueDate: string;
+  pdfMediaId: string;
+  coverMediaId: string;
+  coverImageUrl: string | null;
+  pageCount: number;
+  uploadedBy: string;
+  stats: { downloads: number; views: number };
+  createdAt: string;
+  updatedAt: string;
+}
+
+function shapeEpaper(epaper: EpaperModel, cover: MediaModel | null): EpaperResponse {
+  return {
+    id: epaper._id.toString(),
+    title: epaper.title,
+    issueDate: epaper.issueDate.toISOString(),
+    pdfMediaId: epaper.pdfMediaId.toString(),
+    coverMediaId: epaper.coverMediaId.toString(),
+    coverImageUrl: cover?.url ?? null,
+    pageCount: epaper.pageCount,
+    uploadedBy: epaper.uploadedBy.toString(),
+    stats: {
+      downloads: epaper.stats.downloads,
+      views: epaper.stats.views,
+    },
+    createdAt: epaper.createdAt.toISOString(),
+    updatedAt: epaper.updatedAt.toISOString(),
+  };
+}
 
 // ─── create ─────────────────────────────────────────────────────────────
 
@@ -41,7 +83,7 @@ export interface CreateEpaperInput {
   pageCount?: number;
 }
 
-export async function createEpaper(input: CreateEpaperInput): Promise<EpaperModel> {
+export async function createEpaper(input: CreateEpaperInput): Promise<EpaperResponse> {
   if (input.actorRole !== 'admin') {
     throw ApiError.forbidden('Only admins can publish e-paper issues');
   }
@@ -99,7 +141,8 @@ export async function createEpaper(input: CreateEpaperInput): Promise<EpaperMode
     'epaper_created',
   );
 
-  return epaper;
+  // Cover is already loaded above — reuse it instead of round-tripping again.
+  return shapeEpaper(epaper, cover);
 }
 
 // ─── list (public) ──────────────────────────────────────────────────────
@@ -112,14 +155,22 @@ export interface ListEpapersInput {
 }
 
 export async function listEpapers(input: ListEpapersInput = {}): Promise<{
-  items: EpaperModel[];
+  items: EpaperResponse[];
   total: number;
   page: number;
   limit: number;
 }> {
   const { items, total } = await epaperRepo.list(input);
+
+  // Hydrate cover URLs in a single batch round-trip rather than N+1.
+  // Missing covers (orphan epapers) shape to `coverImageUrl: null` and the
+  // FE renders its fallback icon.
+  const coverIds = items.map((e) => e.coverMediaId);
+  const covers = await mediaRepo.findByIds(coverIds);
+  const coverById = new Map(covers.map((m) => [m._id.toString(), m]));
+
   return {
-    items,
+    items: items.map((e) => shapeEpaper(e, coverById.get(e.coverMediaId.toString()) ?? null)),
     total,
     page: input.page ?? 1,
     limit: input.limit ?? 20,
@@ -128,7 +179,7 @@ export async function listEpapers(input: ListEpapersInput = {}): Promise<{
 
 // ─── get by id (public) ─────────────────────────────────────────────────
 
-export async function getEpaperById(id: string): Promise<EpaperModel> {
+export async function getEpaperById(id: string): Promise<EpaperResponse> {
   if (!Types.ObjectId.isValid(id)) {
     throw ApiError.notFound('Epaper not found');
   }
@@ -140,7 +191,9 @@ export async function getEpaperById(id: string): Promise<EpaperModel> {
   void epaperRepo.incrementStat(epaper._id, 'views').catch((err: unknown) => {
     logger.warn({ err, epaperId: epaper._id.toString() }, 'epaper_views_increment_failed');
   });
-  return epaper;
+
+  const cover = await mediaRepo.findById(epaper.coverMediaId);
+  return shapeEpaper(epaper, cover);
 }
 
 // ─── download (public, presigned GET redirect) ──────────────────────────

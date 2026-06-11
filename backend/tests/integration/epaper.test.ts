@@ -105,6 +105,9 @@ describe('POST /v1/epapers', () => {
     expect(res.body.data.epaper.title).toBe('Morning Edition — May 30, 2026');
     expect(res.body.data.epaper.pageCount).toBe(16);
     expect(res.body.data.epaper.stats.downloads).toBe(0);
+    // Cover URL hydrated from the linked Media doc — readers depend on this
+    // for the archive thumbnail.
+    expect(res.body.data.epaper.coverImageUrl).toMatch(/mock-cdn\.test/);
   });
 
   it('forbids editors from creating an issue (admin-only)', async () => {
@@ -202,6 +205,35 @@ describe('GET /v1/epapers', () => {
     expect(res.body.data.total).toBe(2);
     expect(res.body.data.items[0].title).toBe('Newer');
     expect(res.body.data.items[1].title).toBe('Older');
+    // Both items hydrated with their linked cover URL — batch lookup, not N+1.
+    expect(res.body.data.items[0].coverImageUrl).toMatch(/mock-cdn\.test/);
+    expect(res.body.data.items[1].coverImageUrl).toMatch(/mock-cdn\.test/);
+  });
+
+  it('hydrates coverImageUrl to null when the linked cover media doc is missing', async () => {
+    const admin = await seedUser('admin');
+    const { pdfId, coverId } = await seedEpaperMedia(admin.id);
+    const created = await request(app)
+      .post('/v1/epapers')
+      .set('Authorization', `Bearer ${admin.token}`)
+      .send({
+        title: 'Orphan cover',
+        issueDate: '2026-05-30',
+        pdfMediaId: pdfId,
+        coverMediaId: coverId,
+      });
+
+    // Drop the cover media doc — the epaper now has an orphan coverMediaId.
+    await Media.deleteOne({ _id: coverId });
+
+    const list = await request(app).get('/v1/epapers');
+    const orphan = list.body.data.items.find(
+      (e: { id: string }) => e.id === created.body.data.epaper.id,
+    );
+    expect(orphan.coverImageUrl).toBeNull();
+
+    const single = await request(app).get(`/v1/epapers/${created.body.data.epaper.id}`);
+    expect(single.body.data.epaper.coverImageUrl).toBeNull();
   });
 });
 
@@ -224,6 +256,7 @@ describe('GET /v1/epapers/:id', () => {
     const res = await request(app).get(`/v1/epapers/${created.body.data.epaper.id}`);
     expect(res.status).toBe(200);
     expect(res.body.data.epaper.title).toBe('Single');
+    expect(res.body.data.epaper.coverImageUrl).toMatch(/mock-cdn\.test/);
   });
 
   it('returns 404 for an unknown id', async () => {

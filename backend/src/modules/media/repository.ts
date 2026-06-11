@@ -42,6 +42,19 @@ export async function findById(id: Types.ObjectId | string): Promise<MediaModel 
   return Media.findById(id).exec();
 }
 
+/**
+ * Batch-fetch media docs by id. Used by the epaper service to hydrate cover
+ * URLs for an archive page in a single round-trip rather than N+1 lookups.
+ * Returned in insertion order — callers that need a stable order should sort
+ * client-side; we don't promise it here.
+ */
+export async function findByIds(
+  ids: ReadonlyArray<Types.ObjectId | string>,
+): Promise<MediaModel[]> {
+  if (ids.length === 0) return [];
+  return Media.find({ _id: { $in: ids as (Types.ObjectId | string)[] } }).exec();
+}
+
 export async function findByKey(key: string): Promise<MediaModel | null> {
   return Media.findOne({ key }).exec();
 }
