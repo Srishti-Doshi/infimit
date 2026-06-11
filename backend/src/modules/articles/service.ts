@@ -1323,3 +1323,20 @@ async function fetchPublicList(
   const cards = await shapeFeedCards(items);
   return { items: cards, total, page, limit };
 }
+
+/**
+ * Public helper exposed to other modules (e.g. `bookmarks` 5-b) that need to
+ * render a list of articles as feed-card views without duplicating the
+ * shaper. Returns a Map keyed by article id string so callers can look up
+ * the card alongside their own row data. IDs that don't resolve to a
+ * published, non-soft-deleted article simply have no entry — callers render
+ * an "Unavailable" placeholder per docs/13-feature-documentation.md A10.
+ */
+export async function getCardViewsByArticleIds(
+  ids: ReadonlyArray<string>,
+): Promise<Map<string, FeedCardView>> {
+  if (ids.length === 0) return new Map();
+  const articles = await articlesRepo.findByIdsPreservingOrder(ids);
+  const cards = await shapeFeedCards(articles);
+  return new Map(cards.map((c) => [c.id, c]));
+}
