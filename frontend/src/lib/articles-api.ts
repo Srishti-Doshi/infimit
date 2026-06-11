@@ -6,7 +6,7 @@ import type {
   UpdateDraftInput,
 } from './articles-schema';
 import type { ApiSuccess } from '@/types/api';
-import type { Article, ArticleStatus } from '@/types/article';
+import type { Article, ArticleCategory, ArticleStatus, FeedCard, HomeFeed } from '@/types/article';
 
 /**
  * Articles resource client (Subphase 3 surface — author draft + submit).
@@ -70,6 +70,53 @@ export async function listArticles(query: ListArticlesQuery = {}): Promise<Artic
 export async function getArticle(id: string): Promise<Article> {
   const res = await apiClient.get<ApiSuccess<{ article: Article }>>(`/articles/${id}`);
   return res.data.data.article;
+}
+
+/**
+ * `GET /v1/articles/feed/home` — public composite payload for the home page
+ * (5-a). Returns `{ trail, featured, latest, trending }`, server-cached at
+ * `feed:home` for 60s. Backend handles the fallback shapes (trail → latest 5,
+ * featured → null, trending → score-sorted cold-cache).
+ */
+export async function getHomeFeed(): Promise<HomeFeed> {
+  const res = await apiClient.get<ApiSuccess<{ feed: HomeFeed }>>('/articles/feed/home');
+  return res.data.data.feed;
+}
+
+/**
+ * `GET /v1/articles/feed/trending` — public ordered list hydrated from the
+ * `feed:trending` Redis key (5-d cron). Falls back to `stats.trendingScore`
+ * sort server-side when the cache is cold.
+ */
+export async function getTrendingFeed(): Promise<FeedCard[]> {
+  const res = await apiClient.get<ApiSuccess<{ items: FeedCard[] }>>('/articles/feed/trending');
+  return res.data.data.items;
+}
+
+/**
+ * `GET /v1/articles?category=...&location=...&dateFrom=...&dateTo=...` —
+ * public reader list with optional filters (5-a dual-mode path). Returns the
+ * compact `FeedCard` shape. No auth required.
+ */
+export interface PublicListQuery {
+  category?: ArticleCategory;
+  location?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PublicListResult {
+  items: FeedCard[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export async function listPublicArticles(query: PublicListQuery = {}): Promise<PublicListResult> {
+  const res = await apiClient.get<ApiSuccess<PublicListResult>>('/articles', { params: query });
+  return res.data.data;
 }
 
 /**

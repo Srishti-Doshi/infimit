@@ -36,6 +36,27 @@ interface CoverImagePickerProps {
  * still an explicit `onChange(null)` since the user intent there is "leave
  * the field empty".
  */
+/**
+ * Persistent recommendation shown under the label in every state so authors
+ * with an existing cover still see the dimension guidance when deciding
+ * whether to Replace. Mirrors the longer `COVER_RECOMMENDATION_FULL` that
+ * the upload-paths pass to `<MediaUploader helperText>`.
+ */
+const COVER_RECOMMENDATION_SHORT =
+  'Landscape 16:9, ideally 1600×900 px · JPG/WebP/PNG · under 500 KB';
+
+const COVER_RECOMMENDATION_FULL =
+  'Landscape 16:9, ideally 1600×900 px. JPG or WebP for photos, PNG for diagrams. Under 500 KB. Portrait or square covers will letterbox on the home feed.';
+
+function LabelWithHint({ label }: { label: string }): JSX.Element {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <p className="text-body-sm font-medium text-ink-primary">{label}</p>
+      <p className="text-body-xs text-ink-tertiary">{COVER_RECOMMENDATION_SHORT}</p>
+    </div>
+  );
+}
+
 export function CoverImagePicker({
   value,
   onChange,
@@ -50,10 +71,10 @@ export function CoverImagePicker({
   if (replacing) {
     return (
       <div className="flex flex-col gap-2">
-        <p className="text-body-sm font-medium text-ink-primary">{label}</p>
+        <LabelWithHint label={label} />
         <MediaUploader
           purpose="article_cover"
-          helperText="JPG, PNG, or WebP. 16:9 looks best on article pages."
+          helperText={COVER_RECOMMENDATION_FULL}
           onComplete={(media) => {
             onChange({ id: media.id, url: media.url });
             setReplacing(false);
@@ -71,7 +92,7 @@ export function CoverImagePicker({
   if (value) {
     return (
       <div className="flex flex-col gap-2">
-        <p className="text-body-sm font-medium text-ink-primary">{label}</p>
+        <LabelWithHint label={label} />
         <div className="relative overflow-hidden rounded-lg border border-line bg-surface-subtle">
           <div className="aspect-video w-full">
             <img src={value.url} alt="Cover preview" className="h-full w-full object-cover" />
@@ -105,7 +126,7 @@ export function CoverImagePicker({
     <MediaUploader
       purpose="article_cover"
       label={label}
-      helperText="JPG, PNG, or WebP. 16:9 looks best on article pages."
+      helperText={COVER_RECOMMENDATION_FULL}
       onComplete={(media) => onChange({ id: media.id, url: media.url })}
     />
   );

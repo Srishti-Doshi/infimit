@@ -70,6 +70,57 @@ export interface ArticleStats {
   trendingScore: number;
 }
 
+/**
+ * Compact reader-feed card shape — what the backend's `GET /v1/articles/feed/*`
+ * + `GET /v1/articles?category=...` endpoints return per item (5-a).
+ *
+ * Deliberately smaller than `Article` — no body / plainText / internal AI
+ * fields / version / media list. ~200–500 bytes per card vs 5–20 KB for
+ * the full article doc; lets the home feed land 30+ cards in a single
+ * payload without blowing the wire-size budget.
+ */
+export interface FeedCard {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string;
+  coverImageUrl: string | null;
+  category: ArticleCategory;
+  location: string;
+  publishedAt: string | null;
+  author: ArticleAuthorRef | null;
+  ai: {
+    summary: string;
+    readingTimeMin: number;
+    degraded: boolean;
+  };
+  stats: {
+    views: number;
+    commentsCount: number;
+    bookmarks: number;
+  };
+}
+
+/**
+ * Home-feed composite payload — what `GET /v1/articles/feed/home` returns
+ * inside `data.feed`.
+ *
+ *   - `trail`: editorial top-headline strip (server falls back to latest 5
+ *     when no article has `placement.trail=true`)
+ *   - `featured`: every editorially-flagged featured article, sorted by
+ *     `placement.priority` desc then `publishedAt` desc, capped at 5 by
+ *     the backend. FE renders as a carousel — first one is the visible
+ *     hero, the rest rotate.
+ *   - `latest`: chronologically reverse-sorted published articles
+ *   - `trending`: ordered IDs hydrated from the `feed:trending` Redis key
+ */
+export interface HomeFeed {
+  trail: FeedCard[];
+  featured: FeedCard[];
+  latest: FeedCard[];
+  trending: FeedCard[];
+}
+
 export interface Article {
   id: string;
   title: string;
