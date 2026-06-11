@@ -381,3 +381,21 @@ export async function findByIdsPreservingOrder(
   }
   return out;
 }
+
+/**
+ * Atomic adjustment of the denormalised `stats.bookmarks` counter. Used by
+ * the bookmarks module (5-b) on add (+1) and remove (-1). Best-effort: a
+ * counter write failure is logged at the call site but never rolls back the
+ * user-intent action.
+ *
+ * No status / deletedAt filter — even unpublished or soft-deleted articles
+ * keep a counter, so removing a stale bookmark against an unpublished
+ * article still corrects the count rather than leaving it stuck high. The
+ * schema's `min: 0` defends the final stored value.
+ */
+export async function adjustBookmarkCount(
+  id: Types.ObjectId | string,
+  delta: number,
+): Promise<void> {
+  await Article.updateOne({ _id: id }, { $inc: { 'stats.bookmarks': delta } }).exec();
+}

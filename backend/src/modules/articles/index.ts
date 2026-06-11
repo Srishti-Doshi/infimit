@@ -16,6 +16,11 @@ export {
 // metadata when posting). Service-level error mapping stays the consumer's job.
 export * as articlesRepo from './repository';
 
+// Reader-feed shaper — exposed so cross-module list endpoints (e.g. bookmarks
+// 5-b) can render their attached articles as the canonical feed card without
+// duplicating the projection logic.
+export { getCardViewsByArticleIds, type FeedCardView } from './service';
+
 // Events — the typed emitter + the boot-time registration helper. The shared
 // events bus in `@/modules/events` calls registerArticleEventListeners() from
 // app.ts at startup; this barrel exposes the emitter for tests or future

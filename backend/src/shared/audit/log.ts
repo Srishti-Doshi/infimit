@@ -28,7 +28,8 @@ export type AuditEntity =
   | 'article'
   | 'comment'
   | 'media'
-  | 'notification';
+  | 'notification'
+  | 'bookmark';
 
 export interface AuditEvent {
   entity: AuditEntity;
