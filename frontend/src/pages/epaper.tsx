@@ -24,6 +24,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Newspaper } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { Seo } from '@/components/seo';
 import { Button, Container, EmptyState, Skeleton } from '@/components/ui';
 import { listEpapers, type EpapersListResult } from '@/lib/epaper-api';
 import type { Epaper } from '@/types/epaper';
@@ -45,6 +46,10 @@ export default function EpaperPage(): JSX.Element {
 
   return (
     <Container width="wide" className="py-8">
+      <Seo
+        title="E-paper Archive"
+        description="Every issue of the Infimit daily and weekly editions — read online or download the PDF."
+      />
       <header className="mb-8 border-b-2 border-brand-red-500 pb-6">
         <p className="text-body-xs font-semibold uppercase tracking-widest text-brand-red-500">
           E-paper

@@ -1,0 +1,11 @@
+# The Infimit - crawler policy (Sub-PR 5-fe-2).
+# Public reader surface is crawlable; dashboards and auth flows are not
+# (they're auth-gated SPA routes with no indexable content).
+# ASCII only: text/plain is served without a charset hint and multibyte
+# punctuation renders as mojibake in browsers.
+User-agent: *
+Allow: /
+Disallow: /dashboard/
+Disallow: /auth/
+
+# Sitemap is served by the backend (Phase 2 wiring on the production domain).

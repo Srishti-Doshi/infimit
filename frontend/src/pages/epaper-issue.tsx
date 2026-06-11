@@ -24,6 +24,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Download, Eye, FileText, Newspaper } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 
+import { Seo } from '@/components/seo';
 import { Button, Container, Skeleton } from '@/components/ui';
 import { epaperDownloadUrl, getEpaper } from '@/lib/epaper-api';
 import type { Epaper } from '@/types/epaper';
@@ -71,7 +72,14 @@ export default function EpaperIssuePage(): JSX.Element {
       ) : isPending ? (
         <DetailSkeleton />
       ) : (
-        <IssueLayout epaper={data} />
+        <>
+          <Seo
+            title={data.title}
+            description={`E-paper issue dated ${formatIssueDate(data.issueDate)} — read online or download the PDF.`}
+            image={data.coverImageUrl ?? null}
+          />
+          <IssueLayout epaper={data} />
+        </>
       )}
     </Container>
   );
