@@ -39,6 +39,7 @@ import { healthRoutes } from '@/modules/health';
 import apiV1 from './routes';
 import { registerEventListeners } from '@/modules/events';
 import { startMediaSweeper } from '@/modules/media/sweeper';
+import { startTrendingCron } from '@/modules/analytics/trending';
 import { loadEnv } from '@/config/env';
 
 const JSON_BODY_LIMIT = '1mb';
@@ -71,12 +72,15 @@ export function createApp(): Express {
 
   registerEventListeners();
 
-  // Background job: GC orphan media (refCount === 0, older than the grace
-  // period). Skipped in tests because `setInterval` would otherwise keep
-  // the suite from exiting cleanly; tests call `sweepOrphansOnce` directly
-  // when they need to exercise the logic. Pins #82.
+  // Background jobs. Both skipped in tests because `setInterval` would
+  // otherwise keep the suite from exiting cleanly; tests can call the
+  // one-shot functions directly when they need to exercise the logic.
+  //   - media sweeper (5-b precursor / pins #82): GC orphan media docs.
+  //   - trending cron (5-d): recompute the rolling 24h trending list every
+  //     5 min and populate `feed:trending` + `stats.trendingScore` denorm.
   if (loadEnv().NODE_ENV !== 'test') {
     startMediaSweeper();
+    startTrendingCron();
   }
 
   return app;
