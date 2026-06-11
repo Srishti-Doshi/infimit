@@ -104,6 +104,47 @@ async function getStats(articleId: string): Promise<{
   };
 }
 
+/**
+ * Poll the article's `stats.<key>` until it reaches `target` or `maxMs`
+ * elapses. Returns the most recent value seen (so callers can `expect(...).toBe(target)`
+ * for clearer failure messages than a bare timeout).
+ *
+ * Why this exists: `persistAndDenorm` does `await recordEvent(...)` then
+ * `await adjustViewCount(...)`, two sequential awaits. `waitForCount`
+ * resolves when the event lands — i.e. between the two awaits — and the
+ * caller races the denorm. Polling the stat directly synchronises on the
+ * actual signal the assertion cares about.
+ */
+async function waitForStat(
+  articleId: string,
+  key: 'views' | 'uniqueReaders' | 'shares' | 'bookmarks',
+  target: number,
+  maxMs = 1500,
+): Promise<number> {
+  const startedAt = Date.now();
+  let value = 0;
+  // eslint-disable-next-line no-await-in-loop
+  while (Date.now() - startedAt < maxMs) {
+    const fresh = await Article.findById(articleId).exec();
+    value = (fresh?.stats[key] as number | undefined) ?? 0;
+    if (value >= target) return value;
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  return value;
+}
+
+/**
+ * For negative assertions ("counter must stay at zero"). Waits for the event
+ * stream to reach `expectedEvents` AND an extra settle window so the denorm
+ * step (if any) would have completed. Returns once the count is reached;
+ * the caller then asserts the stat hasn't moved.
+ */
+async function waitForEventsThenSettle(expectedEvents: number, settleMs = 100): Promise<void> {
+  await waitForCount(expectedEvents);
+  await new Promise((r) => setTimeout(r, settleMs));
+}
+
 beforeAll(async () => {
   app = await startTestEnv();
 }, 120_000);
@@ -128,10 +169,11 @@ describe('POST /v1/analytics/track', () => {
       .send({ type: 'view', articleId, sessionId: 'sess-1' });
 
     expect(res.status).toBe(204);
-    // Fire-and-forget: wait briefly for the async insert to land.
-    expect(await waitForCount(1)).toBe(1);
-    const fresh = await getStats(articleId);
-    expect(fresh.views).toBe(1);
+    // Fire-and-forget: waitForStat synchronises on the denorm bump (the
+    // signal the assertion cares about) rather than the event-count
+    // (which would race the sequential `await adjustViewCount` inside
+    // `persistAndDenorm`).
+    expect(await waitForStat(articleId, 'views', 1)).toBe(1);
     const ev = await AnalyticsEvent.findOne({ articleId }).exec();
     expect(ev?.type).toBe('view');
     expect(ev?.sessionId).toBe('sess-1');
@@ -143,8 +185,7 @@ describe('POST /v1/analytics/track', () => {
     const articleId = await seedPublishedArticle(author.id);
     const res = await request(app).post('/v1/analytics/track').send({ type: 'share', articleId });
     expect(res.status).toBe(204);
-    await waitForCount(1);
-    expect((await getStats(articleId)).shares).toBe(1);
+    expect(await waitForStat(articleId, 'shares', 1)).toBe(1);
   });
 
   it('ignores a body-supplied userId; req.user is the only source of truth', async () => {
@@ -161,7 +202,9 @@ describe('POST /v1/analytics/track', () => {
       .send({ type: 'view', articleId, userId: attackerId });
 
     expect(res.status).toBe(204);
-    await waitForCount(1);
+    // Wait on the denorm — it implies the event insert completed too,
+    // since recordEvent is awaited before the bump.
+    await waitForStat(articleId, 'views', 1);
     const ev = await AnalyticsEvent.findOne({ articleId }).exec();
     expect(ev?.userId?.toString()).toBe(reader.id);
     expect(ev?.userId?.toString()).not.toBe(attackerId);
@@ -176,13 +219,17 @@ describe('POST /v1/analytics/track', () => {
       .post('/v1/analytics/track')
       .set('Authorization', `Bearer ${reader.token}`)
       .send({ type: 'read_complete', articleId });
-    await waitForCount(1);
+    // First event MUST bump the denorm — wait on the stat, not the count.
+    await waitForStat(articleId, 'uniqueReaders', 1);
 
     await request(app)
       .post('/v1/analytics/track')
       .set('Authorization', `Bearer ${reader.token}`)
       .send({ type: 'read_complete', articleId });
-    await waitForCount(2);
+    // Second event must NOT bump. Wait for the second event to land, plus
+    // a settle window so the gate-decision-then-no-op denorm completes,
+    // before asserting the counter stayed at 1.
+    await waitForEventsThenSettle(2);
 
     expect((await getStats(articleId)).uniqueReaders).toBe(1);
   });
@@ -196,7 +243,9 @@ describe('POST /v1/analytics/track', () => {
       .send({ type: 'read_complete', articleId, sessionId: 'anon-1' });
 
     expect(res.status).toBe(204);
-    await waitForCount(1);
+    // Negative assertion — wait for the event + settle so the (no-op for
+    // anonymous) denorm has had its chance to NOT bump.
+    await waitForEventsThenSettle(1);
     expect((await getStats(articleId)).uniqueReaders).toBe(0);
   });
 
