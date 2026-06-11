@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { FileQuestion, Sparkles } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 
+import { BookmarkButton } from '@/components/bookmark-button';
 import { CommentThread } from '@/components/editor/comment-thread';
 import { SanitizedHtml } from '@/components/sanitized-html';
 import { Button, Card, CardBody, Container, EmptyState, Skeleton } from '@/components/ui';
@@ -103,6 +104,9 @@ export default function ArticlePage(): JSX.Element {
           ) : null}
           {article.ai?.readingTimeMin ? <> · ~{article.ai.readingTimeMin} min read</> : null}
         </p>
+        <div className="mt-5">
+          <BookmarkButton articleId={article.id} />
+        </div>
       </header>
 
       {/* ─── Cover ───────────────────────────────────────────────────── */}
