@@ -53,7 +53,7 @@ const ROLE_LABELS: Record<Role, string> = {
 
 const READER_NAV: NavItem[] = [
   { label: 'Home', href: '/', icon: Home, end: true },
-  { label: 'My library', href: '/dashboard/reader', icon: Bookmark },
+  { label: 'Bookmarks', href: '/dashboard/me/bookmarks', icon: Bookmark },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
   { label: 'Profile', href: '/dashboard/me', icon: UserIcon },
 ];
@@ -62,6 +62,8 @@ const AUTHOR_NAV: NavItem[] = [
   { label: 'Home', href: '/', icon: Home, end: true },
   { label: 'My drafts', href: '/dashboard/author/drafts', icon: FileText },
   { label: 'My submissions', href: '/dashboard/author/submissions', icon: Send },
+  // Every role is also a reader — bookmarks are universal (5-fd).
+  { label: 'Bookmarks', href: '/dashboard/me/bookmarks', icon: Bookmark },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
   { label: 'Profile', href: '/dashboard/me', icon: UserIcon },
 ];
@@ -73,6 +75,8 @@ const EDITOR_NAV: NavItem[] = [
   // Editors can author drafts too (per PR #40 COI fix). "My drafts" gives
   // them a way back to drafts they create via the Write article CTA (#53).
   { label: 'My drafts', href: '/dashboard/author/drafts', icon: FileText },
+  // Every role is also a reader — bookmarks are universal (5-fd).
+  { label: 'Bookmarks', href: '/dashboard/me/bookmarks', icon: Bookmark },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
   { label: 'Profile', href: '/dashboard/me', icon: UserIcon },
 ];
@@ -92,6 +96,8 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'E-papers', href: '/dashboard/admin/epapers', icon: Newspaper },
   // Admins can author drafts too. Same rationale as EDITOR_NAV's My drafts.
   { label: 'My drafts', href: '/dashboard/author/drafts', icon: FileText },
+  // Every role is also a reader — bookmarks are universal (5-fd).
+  { label: 'Bookmarks', href: '/dashboard/me/bookmarks', icon: Bookmark },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
   { label: 'Profile', href: '/dashboard/me', icon: UserIcon },
 ];
