@@ -20,6 +20,7 @@ import {
   deleteArticleHandler,
   getArticleBySlugHandler,
   getArticleHandler,
+  getArticlePdfHandler,
   getHomeFeedHandler,
   getTrendingFeedHandler,
   listArticlesHandler,
@@ -167,7 +168,9 @@ router.post(
 // TTS regeneration is Subphase 4+ but doesn't ship in PR #10 — kept as a stub.
 router.post('/:id/ai/tts', notImplemented('Subphase 4'));
 
-// ─── Subphase 5 stubs ───────────────────────────────────────────────────
-router.get('/:id/pdf', notImplemented('Subphase 5'));
+// ─── Subphase 5 — article PDF download (public, no auth) ────────────────
+// Service-layer 404s on non-published articles, so anonymous readers see
+// the same shape as the slug-read endpoint.
+router.get('/:id/pdf', validate({ params: articleIdParamSchema }), getArticlePdfHandler);
 
 export default router;

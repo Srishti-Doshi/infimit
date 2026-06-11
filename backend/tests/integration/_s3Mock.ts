@@ -103,6 +103,23 @@ export function __setUploadedBytes(key: string, bytes: Buffer): void {
 }
 
 /**
+ * Mirror of `putObject` from the real module. Captures the bytes so the
+ * article-PDF tests can assert "the cached PDF survived a second call" via
+ * `objectExists` returning true on the same key.
+ */
+export async function putObject(key: string, body: Buffer, _contentType: string): Promise<void> {
+  uploadedBytes.set(key, body);
+}
+
+/**
+ * Mirror of `objectExists` from the real module. Returns true when the key
+ * has been written via `putObject` / `__setUploadedBytes`, false otherwise.
+ */
+export async function objectExists(key: string): Promise<boolean> {
+  return uploadedBytes.has(key);
+}
+
+/**
  * Mirror of `presignDownload` from the real module. Returns a deterministic
  * `mock-s3.test` URL embedding the key so tests can assert on the 302
  * Location from the e-paper download endpoint.

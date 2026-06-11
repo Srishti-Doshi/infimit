@@ -17,6 +17,7 @@ import { loadEnv } from '@/config/env';
 import { logger } from '@/config/logger';
 import { connectMongo, disconnectMongo } from '@/config/db';
 import { connectRedis, disconnectRedis } from '@/config/redis';
+import { flushSentry, initSentry } from '@/config/sentry';
 import { loadJwtKeys } from '@/shared/crypto';
 import { createApp } from './app';
 
@@ -26,6 +27,11 @@ async function bootstrap(): Promise<void> {
   const env = loadEnv();
 
   logger.info({ env: env.NODE_ENV, port: env.PORT }, 'boot_start');
+
+  // Initialise Sentry before anything else can throw — captures errors
+  // from the rest of bootstrap. No-op when SENTRY_DSN is empty (the dev
+  // default), so this is safe to call unconditionally.
+  initSentry();
 
   // Load RS256 keypairs before anything that might sign/verify JWTs. Failure
   // here aborts boot — better than a 500 on the first auth request.
@@ -67,7 +73,7 @@ function registerShutdownHandlers(server: http.Server): void {
       });
       logger.info('http_closed');
 
-      await Promise.allSettled([disconnectMongo(), disconnectRedis()]);
+      await Promise.allSettled([disconnectMongo(), disconnectRedis(), flushSentry()]);
       logger.info('shutdown_complete');
       clearTimeout(force);
       process.exit(0);
