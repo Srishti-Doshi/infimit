@@ -8,3 +8,10 @@ export {
 } from './model';
 export * as analyticsRepo from './repository';
 export { trackEvent, contextFromRequest } from './service';
+export {
+  computeTrendingOnce,
+  startTrendingCron,
+  stopTrendingCron,
+  type TrendingComputeOptions,
+  type TrendingComputeResult,
+} from './trending';

@@ -125,8 +125,15 @@ export async function getPlatformEventCounts(): Promise<{
   return { views, reads, shares, bookmarks, commentEvents };
 }
 
+/**
+ * Exact count over the full collection. Used by integration tests'
+ * `waitForCount` helper after the fire-and-forget tracking writes — must
+ * reflect post-insert state immediately, so we use `countDocuments({})`
+ * (live scan) rather than `estimatedDocumentCount()` (cached metadata that
+ * lags writes + `deleteMany`-driven resets between test cases).
+ */
 export async function countAll(): Promise<number> {
-  return AnalyticsEvent.estimatedDocumentCount().exec();
+  return AnalyticsEvent.countDocuments({}).exec();
 }
 
 export type { AnalyticsEventDocument, AnalyticsEventModel, AnalyticsEventType };
