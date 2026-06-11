@@ -25,7 +25,7 @@ export const createEpaperHandler = asyncHandler(async (req: Request, res: Respon
     coverMediaId: body.coverMediaId,
     pageCount: body.pageCount,
   });
-  res.status(201).json({ success: true, data: { epaper: epaper.toJSON() } });
+  res.status(201).json({ success: true, data: { epaper } });
 });
 
 export const listEpapersHandler = asyncHandler(async (req: Request, res: Response) => {
@@ -34,7 +34,7 @@ export const listEpapersHandler = asyncHandler(async (req: Request, res: Respons
   res.status(200).json({
     success: true,
     data: {
-      items: result.items.map((e) => e.toJSON()),
+      items: result.items,
       total: result.total,
       page: result.page,
       limit: result.limit,
@@ -45,7 +45,7 @@ export const listEpapersHandler = asyncHandler(async (req: Request, res: Respons
 export const getEpaperHandler = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params as { id: string };
   const epaper = await getEpaperById(id);
-  res.status(200).json({ success: true, data: { epaper: epaper.toJSON() } });
+  res.status(200).json({ success: true, data: { epaper } });
 });
 
 /**
