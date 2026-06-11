@@ -37,7 +37,9 @@ import { mediaRepo } from '@/modules/media';
 import { usersRepo } from '@/modules/users';
 import { logger } from '@/config/logger';
 import { getRedis } from '@/config/redis';
+import { objectExists, presignDownload, putObject } from '@/config/s3';
 
+import { bufferToReadable, pdfCacheKey, pdfDownloadFilename, renderArticlePdf } from './pdf';
 import { articleEvents } from './events';
 import type { ArticleModel, ArticleStatus } from './model';
 import * as articlesRepo from './repository';
@@ -1339,4 +1341,101 @@ export async function getCardViewsByArticleIds(
   const articles = await articlesRepo.findByIdsPreservingOrder(ids);
   const cards = await shapeFeedCards(articles);
   return new Map(cards.map((c) => [c.id, c]));
+}
+
+// ─── PDF generation (5-e) ───────────────────────────────────────────────
+
+export type ArticlePdfResponse =
+  | {
+      /** First-render path: hand the buffer back to the controller to stream
+       * directly. The buffer has also been persisted to S3 so subsequent
+       * calls hit the redirect path. */
+      mode: 'stream';
+      body: NodeJS.ReadableStream;
+      filename: string;
+      contentType: 'application/pdf';
+    }
+  | {
+      /** Cache-hit path: redirect the client at a short-TTL presigned GET
+       * URL, offloading the bytes to S3 (no Express CPU). */
+      mode: 'redirect';
+      url: string;
+    };
+
+/**
+ * Resolve a public-readable PDF for a published article. Two-stage:
+ *
+ *   1. If `articles/<id>/v<version>.pdf` exists in S3 → presign + redirect.
+ *   2. Otherwise render via pdfkit, write to S3, stream the buffer back to
+ *      the caller.
+ *
+ * 404 on non-published articles (drafts / submitted / unpublished). Public
+ * — no auth required. The article's `version` field doubles as the cache
+ * buster: any edit bumps `version`, the cache key changes, the next call
+ * regenerates.
+ */
+export async function getArticlePdf(id: string): Promise<ArticlePdfResponse> {
+  if (!Types.ObjectId.isValid(id)) {
+    throw ApiError.notFound('Article not found');
+  }
+  const article = await articlesRepo.findById(id);
+  if (!article || article.status !== 'published') {
+    throw ApiError.notFound('Article not found');
+  }
+
+  const key = pdfCacheKey(article._id.toString(), article.version);
+  const filename = pdfDownloadFilename(article.slug);
+
+  try {
+    const exists = await objectExists(key);
+    if (exists) {
+      const url = await presignDownload(key);
+      return { mode: 'redirect', url };
+    }
+  } catch (err) {
+    // HEAD failed for a non-404 reason. Fall through to regeneration
+    // rather than 5xx — the slower path still gives the user their PDF.
+    logger.warn(
+      { err, articleId: article._id.toString(), key },
+      'pdf_cache_head_failed_falling_through',
+    );
+  }
+
+  const authors = await loadAuthorsByIds([article.authorId]);
+  const authorName = authors.get(article.authorId.toString())?.name ?? null;
+
+  const buffer = await renderArticlePdf({ article, authorName });
+
+  try {
+    await putObject(key, buffer, 'application/pdf');
+  } catch (err) {
+    // S3 write failed but we have the bytes — still serve them to the user
+    // this round. Worst case: every request regenerates until S3 recovers.
+    auditWarn(
+      {
+        entity: 'article',
+        entityId: article._id.toString(),
+        action: 'pdf_cache_write_failed',
+        details: { key, error: err instanceof Error ? err.message : String(err) },
+      },
+      'article_pdf_cache_write_failed',
+    );
+  }
+
+  auditLog(
+    {
+      entity: 'article',
+      entityId: article._id.toString(),
+      action: 'pdf_generated',
+      details: { key, version: article.version, bytes: buffer.length },
+    },
+    'article_pdf_generated',
+  );
+
+  return {
+    mode: 'stream',
+    body: bufferToReadable(buffer),
+    filename,
+    contentType: 'application/pdf',
+  };
 }
