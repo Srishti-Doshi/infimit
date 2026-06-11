@@ -15,6 +15,7 @@ const CategoryPage = lazy(() => import('@/pages/category'));
 const ArticlePage = lazy(() => import('@/pages/article'));
 const SearchPage = lazy(() => import('@/pages/search'));
 const EpaperPage = lazy(() => import('@/pages/epaper'));
+const EpaperIssuePage = lazy(() => import('@/pages/epaper-issue'));
 
 const LoginPage = lazy(() => import('@/pages/auth/login'));
 const RegisterPage = lazy(() => import('@/pages/auth/register'));
@@ -75,6 +76,7 @@ const router = createBrowserRouter(
         { path: 'article/:slug', element: <ArticlePage /> },
         { path: 'search', element: <SearchPage /> },
         { path: 'epaper', element: <EpaperPage /> },
+        { path: 'epaper/:id', element: <EpaperIssuePage /> },
 
         // Guest-only auth pages: an authed user lands on their role-based
         // dashboard instead. Password recovery + email verification stay
