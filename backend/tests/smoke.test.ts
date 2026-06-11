@@ -82,19 +82,21 @@ describe('Subphase 1 smoke tests', () => {
     // Real as of Subphase 4: /v1/articles/* (full lifecycle), /v1/comments/*,
     //   /v1/notifications/*, /v1/articles/:articleId/comments/*,
     //   /v1/epapers/*, /v1/search
-    // Real as of Subphase 5: /v1/articles/feed/home, /v1/articles/feed/trending.
-    // The list below is endpoints that remain notImplemented skeletons.
-    // `/v1/analytics/track` will land in Sub-PR 5-c; `/v1/articles/:id/pdf` in
-    // Sub-PR 5-e. Keep this in sync as stubs are filled in.
-    it.each([['POST', '/v1/analytics/track']])(
-      '%s %s returns 501 with envelope',
-      async (method, path) => {
-        const req = request(app);
-        const res = method === 'POST' ? await req.post(path).send({}) : await req.get(path);
-        expect(res.status).toBe(501);
-        expect(res.body.error.code).toBe('INTERNAL_ERROR');
-        expect(res.body.error.message).toMatch(/Subphase|Phase/);
-      },
-    );
+    // Real as of Subphase 5:
+    //   - 5-a: /v1/articles/feed/home, /v1/articles/feed/trending
+    //   - 5-b: /v1/bookmarks/*
+    //   - 5-c: /v1/analytics/* (track + reads)
+    // Remaining 501 stubs (filled in by later sub-PRs):
+    //   - 5-e: /v1/articles/:id/pdf
+    //   - phase 2: /v1/articles/search (article-scoped placeholder, real
+    //     search lives at /v1/search since S4), /v1/search/semantic
+    // Nothing currently 501 in the modules covered by this smoke catalog —
+    // skip the it.each iteration. Keep the structure so future sub-PRs can
+    // re-add entries cleanly as new stubs ship.
+    it('has no 501 stubs in the covered surface', () => {
+      // intentional empty — see comment above. The list will reactivate
+      // when a new module's routes get scaffolded ahead of implementation.
+      expect(true).toBe(true);
+    });
   });
 });

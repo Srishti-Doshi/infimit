@@ -399,3 +399,44 @@ export async function adjustBookmarkCount(
 ): Promise<void> {
   await Article.updateOne({ _id: id }, { $inc: { 'stats.bookmarks': delta } }).exec();
 }
+
+/**
+ * Atomic `$inc` of `stats.views`. Used by the analytics writer (5-c) on the
+ * `view` event. Best-effort: a failed counter write doesn't roll back the
+ * raw `analytics_events` insert.
+ */
+export async function adjustViewCount(id: Types.ObjectId | string, delta: number): Promise<void> {
+  await Article.updateOne({ _id: id }, { $inc: { 'stats.views': delta } }).exec();
+}
+
+/**
+ * Atomic `$inc` of `stats.uniqueReaders`. The analytics service gates this
+ * behind a "first read_complete by this user on this article" check so two
+ * `read_complete` events from the same user don't double-count.
+ */
+export async function adjustUniqueReaderCount(
+  id: Types.ObjectId | string,
+  delta: number,
+): Promise<void> {
+  await Article.updateOne({ _id: id }, { $inc: { 'stats.uniqueReaders': delta } }).exec();
+}
+
+/**
+ * Atomic `$inc` of `stats.shares`. Driven by the `share` analytics event.
+ */
+export async function adjustShareCount(id: Types.ObjectId | string, delta: number): Promise<void> {
+  await Article.updateOne({ _id: id }, { $inc: { 'stats.shares': delta } }).exec();
+}
+
+/**
+ * List the `_id`s of every non-soft-deleted article authored by `authorId`.
+ * Used by the analytics module to scope per-author stats queries. Returns a
+ * thin id-only projection — full doc reads happen at the service layer when
+ * the caller needs them.
+ */
+export async function listIdsByAuthor(
+  authorId: Types.ObjectId | string,
+): Promise<Types.ObjectId[]> {
+  const docs = await Article.find({ authorId, deletedAt: null }, { _id: 1 }).lean().exec();
+  return docs.map((d) => d._id);
+}
