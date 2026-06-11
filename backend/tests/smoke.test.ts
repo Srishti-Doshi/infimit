@@ -82,16 +82,19 @@ describe('Subphase 1 smoke tests', () => {
     // Real as of Subphase 4: /v1/articles/* (full lifecycle), /v1/comments/*,
     //   /v1/notifications/*, /v1/articles/:articleId/comments/*,
     //   /v1/epapers/*, /v1/search
+    // Real as of Subphase 5: /v1/articles/feed/home, /v1/articles/feed/trending.
     // The list below is endpoints that remain notImplemented skeletons.
-    it.each([
-      ['GET', '/v1/articles/feed/home'],
-      ['POST', '/v1/analytics/track'],
-    ])('%s %s returns 501 with envelope', async (method, path) => {
-      const req = request(app);
-      const res = method === 'POST' ? await req.post(path).send({}) : await req.get(path);
-      expect(res.status).toBe(501);
-      expect(res.body.error.code).toBe('INTERNAL_ERROR');
-      expect(res.body.error.message).toMatch(/Subphase|Phase/);
-    });
+    // `/v1/analytics/track` will land in Sub-PR 5-c; `/v1/articles/:id/pdf` in
+    // Sub-PR 5-e. Keep this in sync as stubs are filled in.
+    it.each([['POST', '/v1/analytics/track']])(
+      '%s %s returns 501 with envelope',
+      async (method, path) => {
+        const req = request(app);
+        const res = method === 'POST' ? await req.post(path).send({}) : await req.get(path);
+        expect(res.status).toBe(501);
+        expect(res.body.error.code).toBe('INTERNAL_ERROR');
+        expect(res.body.error.message).toMatch(/Subphase|Phase/);
+      },
+    );
   });
 });

@@ -11,7 +11,7 @@
  */
 import { Router } from 'express';
 
-import { requireAuth, requireRole, validate } from '@/middleware';
+import { optionalAuth, requireAuth, requireRole, validate } from '@/middleware';
 import { notImplemented } from '@/modules/_shared/notImplemented';
 
 import {
@@ -20,6 +20,8 @@ import {
   deleteArticleHandler,
   getArticleBySlugHandler,
   getArticleHandler,
+  getHomeFeedHandler,
+  getTrendingFeedHandler,
   listArticlesHandler,
   publishArticleHandler,
   regenerateSummaryHandler,
@@ -42,9 +44,13 @@ import {
 
 const router = Router();
 
-// ─── Subphase 5 stubs (must come BEFORE /:id so they don't shadow it) ───
-router.get('/feed/home', notImplemented('Subphase 5'));
-router.get('/feed/trending', notImplemented('Subphase 5'));
+// ─── Subphase 5 — public reader feeds (no auth) ────────────────────────
+// Must come BEFORE the `/:id` route so Express doesn't match "feed" as an
+// ObjectId. `/search` is served by the dedicated search module at
+// `/v1/search` per docs/05-api-documentation.md §5.14; the placeholder here
+// stays as a routing reminder for any straggler call that lands on it.
+router.get('/feed/home', getHomeFeedHandler);
+router.get('/feed/trending', getTrendingFeedHandler);
 router.get('/search', notImplemented('Subphase 5'));
 
 // ─── Subphase 4 — public slug read (cached) ─────────────────────────────
@@ -76,7 +82,11 @@ router.post(
   validate({ body: createArticleBodySchema }),
   createArticleHandler,
 );
-router.get('/', requireAuth, validate({ query: listArticlesQuerySchema }), listArticlesHandler);
+// `GET /v1/articles` is dual-mode (see controller doc). `optionalAuth`
+// populates `req.user` if a valid Bearer is present, otherwise passes
+// through; the controller decides between the dashboard list and the
+// public reader list based on query shape + auth presence.
+router.get('/', optionalAuth, validate({ query: listArticlesQuerySchema }), listArticlesHandler);
 router.get('/:id', requireAuth, validate({ params: articleIdParamSchema }), getArticleHandler);
 router.patch(
   '/:id',
