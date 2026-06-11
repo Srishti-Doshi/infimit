@@ -1,13 +1,17 @@
+import { useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileQuestion, Sparkles } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 
 import { BookmarkButton } from '@/components/bookmark-button';
+import { DownloadPdfButton } from '@/components/download-pdf-button';
 import { CommentThread } from '@/components/editor/comment-thread';
 import { SanitizedHtml } from '@/components/sanitized-html';
+import { SocialShare } from '@/components/social-share';
 import { Button, Card, CardBody, Container, EmptyState, Skeleton } from '@/components/ui';
 import { getArticleBySlug } from '@/lib/articles-api';
 import { ARTICLE_CATEGORY_LABELS } from '@/lib/articles-schema';
+import { useArticleAnalytics } from '@/lib/use-article-analytics';
 
 /**
  * `/article/:slug` — public reader view.
@@ -23,6 +27,7 @@ import { ARTICLE_CATEGORY_LABELS } from '@/lib/articles-schema';
  */
 export default function ArticlePage(): JSX.Element {
   const { slug = '' } = useParams<{ slug: string }>();
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const {
     data: article,
@@ -37,6 +42,11 @@ export default function ArticlePage(): JSX.Element {
     // backend's Redis cache.
     staleTime: 60_000,
   });
+
+  // `view` after 1s dwell + `read_complete` at 90% of the article BODY
+  // (not the document — comments would otherwise inflate the threshold)
+  // or 2-min dwell. Keyed on the resolved id so the 404 path emits nothing.
+  useArticleAnalytics(article?.id, bodyRef);
 
   if (isLoading) {
     return (
@@ -104,8 +114,10 @@ export default function ArticlePage(): JSX.Element {
           ) : null}
           {article.ai?.readingTimeMin ? <> · ~{article.ai.readingTimeMin} min read</> : null}
         </p>
-        <div className="mt-5">
+        <div className="mt-5 flex flex-wrap items-center gap-3">
           <BookmarkButton articleId={article.id} />
+          <DownloadPdfButton articleId={article.id} />
+          <SocialShare articleId={article.id} title={article.title} />
         </div>
       </header>
 
@@ -135,7 +147,7 @@ export default function ArticlePage(): JSX.Element {
 
       {/* ─── Body — sanitised on render ─────────────────────────────── */}
       <Card className="mt-8">
-        <CardBody>
+        <CardBody ref={bodyRef}>
           <SanitizedHtml html={article.body ?? ''} />
         </CardBody>
       </Card>
