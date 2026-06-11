@@ -18,7 +18,6 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
-  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
   type S3ClientConfig,
@@ -174,56 +173,6 @@ export async function presignDownload(key: string, ttlSec?: number): Promise<str
     Key: key,
   });
   return getSignedUrl(s3, command, { expiresIn });
-}
-
-/**
- * Backend-initiated PUT. Streams a Buffer directly to S3 — used by article
- * PDF generation (5-e) to cache the rendered PDF at
- * `articles/<id>/v<version>.pdf` after first generation. Subsequent reads
- * hit `objectExists` first and 302 to the presigned GET instead of
- * re-rendering.
- */
-export async function putObject(key: string, body: Buffer, contentType: string): Promise<void> {
-  const env = loadEnv();
-  const s3 = getS3();
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: env.S3_BUCKET,
-      Key: key,
-      Body: body,
-      ContentType: contentType,
-    }),
-  );
-}
-
-/**
- * Cheap existence check via HeadObject. Returns true when the object exists,
- * false on 404 / NotFound. Other errors propagate — a transient S3 failure
- * shouldn't masquerade as "object missing".
- *
- * Used by the article PDF cache: a hit returns the presigned GET URL; a
- * miss triggers regeneration. Costs ~10 ms vs ~500 ms-1 s for a fresh PDF
- * render.
- */
-export async function objectExists(key: string): Promise<boolean> {
-  const env = loadEnv();
-  const s3 = getS3();
-  try {
-    await s3.send(
-      new HeadObjectCommand({
-        Bucket: env.S3_BUCKET,
-        Key: key,
-      }),
-    );
-    return true;
-  } catch (err) {
-    const name = (err as { name?: string; $metadata?: { httpStatusCode?: number } }).name;
-    const status = (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
-    if (name === 'NotFound' || status === 404) {
-      return false;
-    }
-    throw err;
-  }
 }
 
 /**

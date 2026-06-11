@@ -22,7 +22,6 @@ import {
   createDraft,
   getArticleById,
   getArticleBySlug,
-  getArticlePdf,
   getHomeFeed,
   getTrendingFeed,
   listArticles,
@@ -161,31 +160,6 @@ export const getHomeFeedHandler = asyncHandler(async (_req: Request, res: Respon
 export const getTrendingFeedHandler = asyncHandler(async (_req: Request, res: Response) => {
   const items = await getTrendingFeed();
   res.status(200).json({ success: true, data: { items } });
-});
-
-/**
- * `GET /v1/articles/:id/pdf` — public PDF download (5-e).
- *
- * Two response shapes from the service:
- *   - `redirect`: 302 to a presigned S3 GET URL (cache hit path)
- *   - `stream`:   200 + `Content-Type: application/pdf` +
- *                 `Content-Disposition: attachment; filename="<slug>.pdf"`
- *                 + the rendered PDF bytes piped through the response
- *                 (first-render path)
- *
- * No `success/data` envelope — the response IS the binary or a 302. Errors
- * still flow through the standard error handler (404 on non-published).
- */
-export const getArticlePdfHandler = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params as { id: string };
-  const result = await getArticlePdf(id);
-  if (result.mode === 'redirect') {
-    res.redirect(302, result.url);
-    return;
-  }
-  res.setHeader('Content-Type', result.contentType);
-  res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
-  result.body.pipe(res);
 });
 
 export const submitArticleHandler = asyncHandler(async (req: Request, res: Response) => {
