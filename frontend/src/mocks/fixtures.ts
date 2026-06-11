@@ -5,7 +5,7 @@
  * `docs/04-database-design.md` and will be ported to typed contracts in
  * Subphase 2+. Keep fixtures intentionally thin so they're easy to swap.
  */
-import type { Article } from '@/types/article';
+import type { Article, FeedCard, HomeFeed } from '@/types/article';
 import type { Comment } from '@/types/comment';
 import type { Epaper } from '@/types/epaper';
 import type { Notification } from '@/types/notification';
@@ -77,6 +77,163 @@ export const mockArticleSummaries = [
     readingTimeMinutes: 5,
   },
 ];
+
+/**
+ * FeedCard fixtures (Sub-PR 5-fa). Mirror the BE's compact reader-card
+ * projection — id, slug, title, subtitle, cover, category, byline, AI
+ * summary preview, stats. Drives the home page in mock mode.
+ */
+function feedCard(
+  input: Partial<FeedCard> & Pick<FeedCard, 'id' | 'slug' | 'title' | 'category'>,
+): FeedCard {
+  return {
+    id: input.id,
+    slug: input.slug,
+    title: input.title,
+    subtitle: input.subtitle ?? '',
+    coverImageUrl: input.coverImageUrl ?? null,
+    category: input.category,
+    location: input.location ?? '',
+    publishedAt: input.publishedAt ?? '2026-05-01T09:00:00.000Z',
+    author: input.author ?? { id: 'usr_author_01', name: 'Ishita Mishra' },
+    ai: input.ai ?? { summary: '', readingTimeMin: 5, degraded: false },
+    stats: input.stats ?? { views: 0, commentsCount: 0, bookmarks: 0 },
+  };
+}
+
+export const mockHomeFeed: HomeFeed = {
+  trail: [
+    feedCard({
+      id: 'feed_trail_001',
+      slug: 'global-higher-education-trends-2026',
+      title: 'Global higher education trends in 2026',
+      category: 'research_innovation',
+    }),
+    feedCard({
+      id: 'feed_trail_002',
+      slug: 'inside-the-2026-engineering-rankings',
+      title: 'Inside the 2026 engineering rankings',
+      category: 'campus_news',
+    }),
+    feedCard({
+      id: 'feed_trail_003',
+      slug: 'campus-accessibility-charter',
+      title: 'A new charter for campus accessibility',
+      category: 'education_policy',
+    }),
+  ],
+  featured: [
+    feedCard({
+      id: 'feed_featured_001',
+      slug: 'ncea-curriculum-overhaul-2026',
+      title: 'NCEA curriculum overhaul lands in 2026',
+      subtitle: 'How the national framework is being rewritten for the AI age',
+      category: 'education_policy',
+      publishedAt: '2026-05-10T09:00:00.000Z',
+      ai: {
+        summary:
+          'New national curriculum centres computational thinking and pairs subject content with mandatory teacher development.',
+        readingTimeMin: 6,
+        degraded: false,
+      },
+      stats: { views: 1240, commentsCount: 18, bookmarks: 42 },
+    }),
+    feedCard({
+      id: 'feed_featured_002',
+      slug: 'transformer-tutors-classroom-trial',
+      title: 'Transformer-based tutors complete first classroom trial',
+      subtitle: 'Early results suggest AI explainers narrow the homework gap',
+      category: 'tech_in_education',
+      publishedAt: '2026-05-12T10:00:00.000Z',
+      author: { id: 'usr_author_03', name: 'Priya Nair' },
+      ai: {
+        summary:
+          'Six-school LLM-tutor pilot narrowed the homework-attainment gap; largest gains in households without home internet.',
+        readingTimeMin: 7,
+        degraded: false,
+      },
+      stats: { views: 980, commentsCount: 22, bookmarks: 38 },
+    }),
+    feedCard({
+      id: 'feed_featured_003',
+      slug: 'state-university-on-campus-startups',
+      title: 'State University opens campus to student-led startups',
+      subtitle: 'Three teams have already shipped products this semester',
+      category: 'campus_news',
+      publishedAt: '2026-05-11T08:30:00.000Z',
+      author: { id: 'usr_author_02', name: 'Arjun Sharma' },
+      ai: {
+        summary:
+          'Campus venture lab pairs seed grants and mentor access with cross-discipline collaboration; three teams already shipped paying products.',
+        readingTimeMin: 5,
+        degraded: false,
+      },
+      stats: { views: 760, commentsCount: 14, bookmarks: 27 },
+    }),
+  ],
+  latest: [
+    feedCard({
+      id: 'feed_latest_001',
+      slug: 'transformer-tutors-classroom-trial',
+      title: 'Transformer-based tutors complete first classroom trial',
+      subtitle: 'Early results suggest AI explainers narrow the homework gap',
+      category: 'tech_in_education',
+      publishedAt: '2026-05-12T10:00:00.000Z',
+      author: { id: 'usr_author_03', name: 'Priya Nair' },
+      ai: {
+        summary:
+          'Six-school LLM-tutor pilot narrowed the homework-attainment gap, with the largest gains in households without home internet.',
+        readingTimeMin: 7,
+        degraded: false,
+      },
+    }),
+    feedCard({
+      id: 'feed_latest_002',
+      slug: 'state-university-on-campus-startups',
+      title: 'State University opens campus to student-led startups',
+      subtitle: 'Three teams have already shipped products this semester',
+      category: 'campus_news',
+      publishedAt: '2026-05-11T08:30:00.000Z',
+      author: { id: 'usr_author_02', name: 'Arjun Sharma' },
+      ai: {
+        summary:
+          'Campus venture lab pairs seed grants and mentor access with cross-discipline collaboration; three teams launched paying products.',
+        readingTimeMin: 5,
+        degraded: false,
+      },
+    }),
+    feedCard({
+      id: 'feed_latest_003',
+      slug: 'why-research-funding-models-matter',
+      title: 'Why research funding models matter',
+      subtitle: 'The quiet policy decisions reshaping postgraduate research worldwide.',
+      category: 'education_policy',
+      publishedAt: '2026-05-05T11:15:00.000Z',
+      author: { id: 'usr_author_03', name: 'Priya Nair' },
+      ai: { summary: '', readingTimeMin: 5, degraded: true },
+    }),
+  ],
+  trending: [
+    feedCard({
+      id: 'feed_trending_001',
+      slug: 'transformer-tutors-classroom-trial',
+      title: 'Transformer-based tutors complete first classroom trial',
+      category: 'tech_in_education',
+    }),
+    feedCard({
+      id: 'feed_trending_002',
+      slug: 'ncea-curriculum-overhaul-2026',
+      title: 'NCEA curriculum overhaul lands in 2026',
+      category: 'education_policy',
+    }),
+    feedCard({
+      id: 'feed_trending_003',
+      slug: 'global-higher-education-trends-2026',
+      title: 'Global higher education trends in 2026',
+      category: 'research_innovation',
+    }),
+  ],
+};
 
 /**
  * Subphase 3 author-shape mock drafts — mirror the real Article wire shape.

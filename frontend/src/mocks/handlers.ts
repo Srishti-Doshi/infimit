@@ -8,6 +8,7 @@ import {
   mockComments,
   mockDrafts,
   mockEpaperIssues,
+  mockHomeFeed,
   mockNotifications,
   mockTags,
   mockUser,
@@ -357,11 +358,13 @@ export const handlers = [
     if (!article) return err('NOT_FOUND', 'Article not found', 404);
     return ok({ article });
   }),
-  // Subphase 5 reader-shape handlers — kept on the renamed summary fixture
-  // until the reader UI lands.
-  http.get(`${BASE}/articles/feed/home`, () =>
-    ok({ hero: mockArticleSummaries[0], rail: mockArticleSummaries.slice(1) }),
-  ),
+  // Subphase 5 reader-shape handlers (5-a feeds, 5-fa home page).
+  // The home feed returns the composite `{ feed: { trail, featured, latest,
+  // trending } }` shape per docs/13-feature-documentation.md A3. Fixtures
+  // are minimal `FeedCard` shapes — enough for the FE to render a real
+  // home page in mock mode without standing up the backend.
+  http.get(`${BASE}/articles/feed/home`, () => ok({ feed: mockHomeFeed })),
+  http.get(`${BASE}/articles/feed/trending`, () => ok({ items: mockHomeFeed.trending })),
   // GET /articles/slug/:slug — public reader read; only published articles
   // surface. Subphase 5's reader-shape `mockArticleSummaries` is no longer the
   // source — we now read from `mockDraftsState` to get the full Article shape
