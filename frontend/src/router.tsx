@@ -16,6 +16,10 @@ const ArticlePage = lazy(() => import('@/pages/article'));
 const SearchPage = lazy(() => import('@/pages/search'));
 const EpaperPage = lazy(() => import('@/pages/epaper'));
 const EpaperIssuePage = lazy(() => import('@/pages/epaper-issue'));
+const AboutPage = lazy(() => import('@/pages/about'));
+const ContactPage = lazy(() => import('@/pages/contact'));
+const PrivacyPage = lazy(() => import('@/pages/legal/privacy'));
+const TermsPage = lazy(() => import('@/pages/legal/terms'));
 
 const LoginPage = lazy(() => import('@/pages/auth/login'));
 const RegisterPage = lazy(() => import('@/pages/auth/register'));
@@ -78,6 +82,10 @@ const router = createBrowserRouter(
         { path: 'search', element: <SearchPage /> },
         { path: 'epaper', element: <EpaperPage /> },
         { path: 'epaper/:id', element: <EpaperIssuePage /> },
+        { path: 'about', element: <AboutPage /> },
+        { path: 'contact', element: <ContactPage /> },
+        { path: 'legal/privacy', element: <PrivacyPage /> },
+        { path: 'legal/terms', element: <TermsPage /> },
 
         // Guest-only auth pages: an authed user lands on their role-based
         // dashboard instead. Password recovery + email verification stay

@@ -38,6 +38,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
+import { Seo } from '@/components/seo';
 import { Container, Spinner } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getHomeFeed } from '@/lib/articles-api';
@@ -109,6 +110,7 @@ export default function HomePage(): JSX.Element {
 
   return (
     <div className="pb-16">
+      <Seo bare title="The Infimit — Higher Education News & Events Network" />
       {data.featured.length > 0 ? (
         <Container width="wide" className="pt-6">
           <FeaturedHero articles={data.featured} topStories={data.trail.slice(0, 4)} />
