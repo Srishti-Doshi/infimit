@@ -82,4 +82,27 @@ describe('<CommentThread>', () => {
 
     successSpy.mockRestore();
   });
+
+  it('emits a `comment` analytics event on successful post, not on failure (5-fe-3)', async () => {
+    setUser('reader');
+    const user = userEvent.setup();
+
+    const analytics = await import('@/lib/analytics-api');
+    const trackSpy = vi.spyOn(analytics, 'trackEvent').mockResolvedValue();
+    const toastModule = await import('@/components/ui');
+    const successSpy = vi.spyOn(toastModule.toast, 'success').mockImplementation(() => '');
+
+    renderWithProviders(<CommentThread articleId="art_published_001" />);
+
+    const textarea = await screen.findByPlaceholderText(/share your thoughts/i);
+    await user.type(textarea, 'Another thoughtful comment for the analytics test.');
+    await user.click(screen.getByRole('button', { name: /post comment/i }));
+
+    await waitFor(() => expect(successSpy).toHaveBeenCalled(), { timeout: 2000 });
+    expect(trackSpy).toHaveBeenCalledTimes(1);
+    expect(trackSpy).toHaveBeenCalledWith({ type: 'comment', articleId: 'art_published_001' });
+
+    trackSpy.mockRestore();
+    successSpy.mockRestore();
+  });
 });

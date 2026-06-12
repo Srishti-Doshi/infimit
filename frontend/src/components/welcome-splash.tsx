@@ -49,6 +49,7 @@ export function WelcomeSplash(): JSX.Element {
       hideCloseButton
       panelClassName="bg-ink-primary ring-2 ring-brand-red-500"
       ariaLabel="Welcome to The Infimit"
+      ariaDescription="Higher Education News and Events Network"
     >
       <div className="px-8 py-12 text-center sm:px-12 sm:py-14">
         <p className="font-display text-body-sm font-medium uppercase tracking-[0.2em] text-ink-inverse/70">

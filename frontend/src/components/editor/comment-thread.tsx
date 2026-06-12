@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { Button, Card, CardBody, EmptyState, Skeleton, toast } from '@/components/ui';
+import { trackEvent } from '@/lib/analytics-api';
 import { listArticleComments, postComment } from '@/lib/comments-api';
 import { postCommentSchema } from '@/lib/comments-schema';
 import { toastError } from '@/lib/error-messages';
@@ -51,6 +52,9 @@ export function CommentThread({ articleId }: CommentThreadProps): JSX.Element {
   const mutation = useMutation({
     mutationFn: () => postComment(articleId, { body: body.trim() }),
     onSuccess: async () => {
+      // Fire-and-forget analytics emit (5-fe-3). In onSuccess, not
+      // mutationFn, so a failed post never counts as a comment event.
+      void trackEvent({ type: 'comment', articleId });
       // New comment is `pending` and won't appear in this thread yet — but
       // invalidate the cache anyway so any concurrent admin view picks it up.
       await queryClient.invalidateQueries({ queryKey: ['comments', 'article', articleId] });
