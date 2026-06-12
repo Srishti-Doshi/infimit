@@ -62,6 +62,8 @@ const AUTHOR_NAV: NavItem[] = [
   { label: 'Home', href: '/', icon: Home, end: true },
   { label: 'My drafts', href: '/dashboard/author/drafts', icon: FileText },
   { label: 'My submissions', href: '/dashboard/author/submissions', icon: Send },
+  // The author's live pieces + reader stats (5-fe-3, closes #78).
+  { label: 'Published', href: '/dashboard/author/published', icon: Newspaper },
   // Every role is also a reader — bookmarks are universal (5-fd).
   { label: 'Bookmarks', href: '/dashboard/me/bookmarks', icon: Bookmark },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
@@ -75,6 +77,8 @@ const EDITOR_NAV: NavItem[] = [
   // Editors can author drafts too (per PR #40 COI fix). "My drafts" gives
   // them a way back to drafts they create via the Write article CTA (#53).
   { label: 'My drafts', href: '/dashboard/author/drafts', icon: FileText },
+  // Editors author pieces too — same live-pieces view as authors (#78).
+  { label: 'Published', href: '/dashboard/author/published', icon: Newspaper },
   // Every role is also a reader — bookmarks are universal (5-fd).
   { label: 'Bookmarks', href: '/dashboard/me/bookmarks', icon: Bookmark },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
