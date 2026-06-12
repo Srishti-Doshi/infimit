@@ -60,6 +60,10 @@ export default function VerifyEmailPage(): JSX.Element {
             <>
               <Spinner size="lg" className="mt-6" label="Verifying your email" />
               <ModalTitle className="mt-4">Verifying your email&hellip;</ModalTitle>
+              {/* sr-only: Radix warns when DialogContent has no Description (#26). */}
+              <ModalDescription className="sr-only">
+                Please wait while we confirm your verification link.
+              </ModalDescription>
             </>
           )}
 

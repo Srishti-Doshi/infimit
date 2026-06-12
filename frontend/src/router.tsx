@@ -3,7 +3,6 @@ import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom';
 
 import { RedirectIfAuthed, RequireAuth, RequireRole } from '@/components/auth-guards';
 import { AppLayout, DashboardLayout } from '@/components/layout';
-import { Spinner } from '@/components/ui';
 
 import ForbiddenPage from '@/pages/forbidden';
 import NotFoundPage from '@/pages/not-found';
@@ -30,11 +29,11 @@ const VerifyEmailPage = lazy(() => import('@/pages/auth/verify-email'));
 const ProfilePage = lazy(() => import('@/pages/dashboard/me'));
 const BookmarksPage = lazy(() => import('@/pages/dashboard/me/bookmarks'));
 const NotificationsPage = lazy(() => import('@/pages/dashboard/notifications'));
-const ReaderDashboardPage = lazy(() => import('@/pages/dashboard/reader'));
 const DraftsPage = lazy(() => import('@/pages/dashboard/author/drafts'));
 const NewDraftPage = lazy(() => import('@/pages/dashboard/author/drafts/new'));
 const EditDraftPage = lazy(() => import('@/pages/dashboard/author/drafts/edit'));
 const SubmissionsPage = lazy(() => import('@/pages/dashboard/author/submissions'));
+const PublishedPage = lazy(() => import('@/pages/dashboard/author/published'));
 const EditorDashboardPage = lazy(() => import('@/pages/dashboard/editor'));
 const ApprovalsPage = lazy(() => import('@/pages/dashboard/editor/approvals'));
 const ApprovalPreviewPage = lazy(() => import('@/pages/dashboard/editor/approvals/preview'));
@@ -48,10 +47,18 @@ const AdminApprovalsPage = lazy(() => import('@/pages/dashboard/admin/approvals'
 const AdminEpapersPage = lazy(() => import('@/pages/dashboard/admin/epapers'));
 const NewEpaperPage = lazy(() => import('@/pages/dashboard/admin/epapers/new'));
 
+/**
+ * Quiet Suspense fallback (#88). Route chunks load in tens of milliseconds;
+ * the old centered spinner flashed and was immediately replaced by the
+ * destination page's own skeleton — two loading signals back-to-back read
+ * as flicker on slow networks. An empty block with a height floor (so the
+ * footer doesn't jump) lets the page skeleton be the ONLY loading state.
+ * The sr-only status line keeps screen readers informed during the gap.
+ */
 function RouteFallback(): JSX.Element {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center text-brand-red-500">
-      <Spinner size="lg" label="Loading page" />
+    <div className="min-h-[50vh]" role="status" aria-live="polite">
+      <span className="sr-only">Loading page</span>
     </div>
   );
 }
@@ -114,7 +121,6 @@ const router = createBrowserRouter(
                 { path: 'dashboard/me', element: <ProfilePage /> },
                 { path: 'dashboard/me/bookmarks', element: <BookmarksPage /> },
                 { path: 'dashboard/notifications', element: <NotificationsPage /> },
-                { path: 'dashboard/reader/*', element: <ReaderDashboardPage /> },
                 {
                   element: <RequireRole roles={['author', 'editor', 'admin']} />,
                   children: [
@@ -127,6 +133,7 @@ const router = createBrowserRouter(
                     { path: 'dashboard/author/drafts/new', element: <NewDraftPage /> },
                     { path: 'dashboard/author/drafts/:id', element: <EditDraftPage /> },
                     { path: 'dashboard/author/submissions', element: <SubmissionsPage /> },
+                    { path: 'dashboard/author/published', element: <PublishedPage /> },
                   ],
                 },
                 {
