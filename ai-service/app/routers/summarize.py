@@ -16,7 +16,7 @@ from app.middleware.rate_limiter import is_rate_limited
 router = APIRouter()
 
 @router.post("/summarize", response_model=SummarizeResponse)
-def summarize(
+async def summarize(
     data: SummarizeRequest,
     request: Request,
     _: bool = Depends(verify_internal_key)
@@ -33,7 +33,7 @@ def summarize(
     increment_total_requests()
 
     try:
-        result = summarize_text(
+        result = await summarize_text(
             text=data.text,
             max_words=data.maxWords,
             style=data.style
@@ -47,14 +47,24 @@ def summarize(
             "SUCCESS"
         )
 
-        return {
-            "summary": result,
-            "confidence": 0.9,
-            "model": "llama-3.3-70b-versatile",
-            "tokensIn": len(data.text.split()),
-            "tokensOut": len(result.split()),
-            "cached": False
-        }
+        from fastapi.responses import JSONResponse
+
+        headers = {}
+        
+        if result.get("degraded"):
+            headers["X-Degraded"] = "true"
+        
+        return JSONResponse(
+            content={
+                "summary": result["summary"],
+                "confidence": result["confidence"],
+                "model": result["model"],
+                "tokensIn": result["tokensIn"],
+                "tokensOut": result["tokensOut"],
+                "cached": result["cached"]
+            },
+            headers=headers
+        )
 
     except Exception as e:
         increment_failed_requests()

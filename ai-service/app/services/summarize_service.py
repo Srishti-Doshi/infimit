@@ -1,126 +1,142 @@
-from app.models.loader import get_groq_client
-from app.utils.cache import get_cache, set_cache
-import logging
+import asyncio
 import hashlib
+import traceback
 
-logger = logging.getLogger(__name__)
+from app.services.model_loader import model_loader
+from app.utils.cache import summarize_cache
+from app.config import settings
+
+def _word_count(text: str):
+    return len(text.split())
 
 
-def summarize_text(text: str, max_words: int = 120, style: str = "default"):
+def _truncate_words(text: str, max_words: int):
+    words = text.split()
+    return " ".join(words[:max_words])
+
+
+def _confidence(summary: str):
+    return round(
+        min(
+            1.0,
+            len(summary) / 400
+        ),
+        2
+    )
+
+def _apply_style(summary: str, style: str):
+
+    if style == "engaging":
+        return f"In a striking development, {summary}"
+
+    if style == "academic":
+        return f"Abstract: {summary}"
+
+    return summary
+
+
+def _truncate_500(text: str):
+
+    if len(text) <= 500:
+        return text
+
+    cut = text[:500]
+
+    last_space = cut.rfind(" ")
+
+    if last_space > 0:
+        cut = cut[:last_space]
+
+    return cut + "..."
+
+
+async def summarize_text(
+    text: str,
+    max_words: int,
+    style: str
+):
+
+    key = hashlib.sha256(
+        f"{text}|{max_words}|{style}".encode()
+    ).hexdigest()
+
+    cached = summarize_cache.get(key)
+
+    if cached:
+        return {
+            **cached,
+            "cached": True
+        }
+
+    if settings.FORCE_FALLBACK:
+
+        fallback = {
+            "summary": _truncate_words(text, max_words),
+            "confidence": 0.0,
+            "model": "fallback-truncate",
+            "tokensIn": _word_count(text),
+            "tokensOut": max_words,
+            "cached": False,
+            "degraded": True
+        }
+
+        summarize_cache.set(key, fallback)
+
+        return fallback
+
     try:
-        # -------------------------
-        # 1. CACHE KEY
-        # -------------------------
-        cache_key = "summarize:" + hashlib.md5(text.encode()).hexdigest()
 
-        cached_result = get_cache(cache_key)
+        pipe = await model_loader.get_summarizer()
 
-        # Always return cached value if valid
-        if isinstance(cached_result, str) and cached_result.strip():
-            return cached_result
-
-        # -------------------------
-        # 2. LOAD MODEL CLIENT
-        # -------------------------
-        client = get_groq_client()
-
-        word_count = len(text.split())
-
-        # -------------------------
-        # 3. SYSTEM PROMPTS (UPDATED)
-        # -------------------------
-
-        # SHORT ARTICLE
-        if word_count < 300:
-
-            system_prompt = """
-You are an expert news editor for a newspaper-style education news platform.
-
-TASK:
-Convert the given article into a QUICK READ SUMMARY IN POINTS.
-
-REQUIREMENTS:
-- Output ONLY bullet points (no paragraphs)
-- Each point must be short and clear
-- Preserve all important facts
-- No extra commentary
-- Focus on who, what, when, where, why
-- Make it fast to read (designed for busy users)
-- Use simple English
-
-FORMAT:
-• Point 1
-• Point 2
-• Point 3
-"""
-
-        # MEDIUM ARTICLE
-        elif word_count <= 1500:
-
-            system_prompt = """
-You are a senior editor for a professional education news platform.
-
-TASK:
-Convert the article into a structured POINT-WISE NEWS SUMMARY.
-
-REQUIREMENTS:
-- Output only bullet points
-- Each point should represent one key idea
-- Preserve all important facts, names, dates, numbers
-- Focus on education-related updates (schools, colleges, exams, scholarships, etc.)
-- No repetition
-- Keep language simple and news-friendly
-- Make it easy to scan quickly like a newspaper highlights section
-
-FORMAT:
-• Key point 1
-• Key point 2
-• Key point 3
-"""
-
-        # LONG ARTICLE
-        else:
-
-            system_prompt = """
-You are a senior news editor for an education news platform.
-
-TASK:
-Create a detailed but SCANNABLE SUMMARY IN POINTS.
-
-REQUIREMENTS:
-- Convert article into structured bullet points
-- Reduce length but preserve all key information
-- Keep important facts, numbers, deadlines, announcements
-- Remove repetition and unnecessary details
-- Make it suitable for fast reading in a news app
-
-FORMAT:
-• Important point 1
-• Important point 2
-• Important point 3
-"""
-
-        # -------------------------
-        # 4. MODEL CALL
-        # -------------------------
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            temperature=0.2,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text}
-            ]
+        result = await asyncio.to_thread(
+            pipe,
+            text,
+            max_length=max_words,
+            min_length=max(20, int(max_words * 0.5)),
+            do_sample=False,
+            truncation=True
         )
 
-        result = response.choices[0].message.content
+        summary = result[0]["summary_text"]
 
-        # -------------------------
-        # 5. CACHE RESULT
-        # -------------------------
-        set_cache(cache_key, result, ttl=3600)
+        summary = _apply_style(
+            summary,
+            style
+        )
 
-        return result
+        summary = _truncate_500(summary)
+
+        payload = {
+            "summary": summary,
+            "confidence": _confidence(summary),
+            "model": "facebook/bart-large-cnn",
+            "tokensIn": _word_count(text),
+            "tokensOut": _word_count(summary),
+            "cached": False,
+            "degraded": False
+        }
+
+        summarize_cache.set(
+            key,
+            payload
+        )
+
+        return payload
 
     except Exception as e:
-        logger.exception("Summarization failed: %s", str(e))
-        raise Exception(f"Summarization error: {str(e)}")
+        print("SUMMARIZATION ERROR:")
+        traceback.print_exc()
+    
+    
+        return {
+            "summary": _truncate_words(
+                text,
+                max_words
+            ),
+            "confidence": 0.0,
+            "model": "fallback-truncate",
+            "tokensIn": _word_count(text),
+            "tokensOut": max_words,
+            "cached": False,
+            "degraded": True
+        }
