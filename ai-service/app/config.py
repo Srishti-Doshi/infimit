@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     MODELS_CACHE_DIR: str
     ENABLE_METRICS: bool
     GROQ_API_KEY: str 
+    CACHE_SIZE: int = 1024
+    FORCE_FALLBACK: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",
