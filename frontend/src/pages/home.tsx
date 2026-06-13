@@ -38,6 +38,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
+import { FeedCardRow } from '@/components/feed-card-row';
+import { Seo } from '@/components/seo';
 import { Container, Spinner } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getHomeFeed } from '@/lib/articles-api';
@@ -109,6 +111,7 @@ export default function HomePage(): JSX.Element {
 
   return (
     <div className="pb-16">
+      <Seo bare title="The Infimit — Higher Education News & Events Network" />
       {data.featured.length > 0 ? (
         <Container width="wide" className="pt-6">
           <FeaturedHero articles={data.featured} topStories={data.trail.slice(0, 4)} />
@@ -338,28 +341,12 @@ function LatestStories({ items }: SectionProps): JSX.Element {
   return (
     <section aria-labelledby="latest-heading">
       <SectionHeading id="latest-heading">Latest Stories</SectionHeading>
+      {/* Shared row (5-fe-3): converges Latest with the category / search /
+          bookmarks list surfaces — one place to evolve the newspaper row. */}
       <ul className="divide-y divide-line">
         {items.map((card) => (
           <li key={card.id}>
-            <Link
-              to={`/article/${card.slug}`}
-              className="group grid gap-5 py-6 sm:grid-cols-[1fr_200px]"
-            >
-              <div className="min-w-0 space-y-2">
-                <CategoryEyebrow category={card.category} />
-                <h3 className="font-display text-display-sm font-bold leading-tight text-ink-primary transition-colors group-hover:text-brand-red-600">
-                  {card.title}
-                </h3>
-                {card.subtitle ? (
-                  <p className="line-clamp-3 text-body-base text-ink-secondary">{card.subtitle}</p>
-                ) : null}
-                <FeedCardByline card={card} />
-              </div>
-              <CoverArea
-                article={card}
-                wrapperClassName="aspect-[4/3] w-full overflow-hidden sm:order-last"
-              />
-            </Link>
+            <FeedCardRow card={card} />
           </li>
         ))}
       </ul>

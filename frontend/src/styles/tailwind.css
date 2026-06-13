@@ -31,7 +31,10 @@
     /* Ink — text colors, semantic hierarchy */
     --ink-primary: 15 15 16;
     --ink-secondary: 75 85 99;
-    --ink-tertiary: 156 163 175;
+    /* tertiary must keep ≥4.5:1 on white (WCAG AA) — 107 114 128 is 4.83:1.
+       The previous 156 163 175 read fine but measured 2.53:1 and failed the
+       Subphase 5 a11y gate on every byline/date/footer use. */
+    --ink-tertiary: 107 114 128;
     --ink-inverse: 255 255 255;
 
     /* Surface — page and card backgrounds */
