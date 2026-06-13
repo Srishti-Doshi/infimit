@@ -1,5 +1,6 @@
 import time
 from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi.responses import JSONResponse
 
 from app.dependencies import verify_internal_key
 from app.schemas.summarize import SummarizeRequest, SummarizeResponse
@@ -14,6 +15,24 @@ from app.services.metrics_service import (
 from app.middleware.rate_limiter import is_rate_limited
 
 router = APIRouter()
+
+def _word_count(text: str):
+    return len(text.split())
+
+
+def _normalize_summary_result(result, data: SummarizeRequest):
+    if isinstance(result, str):
+        return {
+            "summary": result,
+            "confidence": 1.0,
+            "model": "stub",
+            "tokensIn": _word_count(data.text),
+            "tokensOut": _word_count(result),
+            "cached": False,
+            "degraded": False
+        }
+
+    return result
 
 @router.post("/summarize", response_model=SummarizeResponse)
 async def summarize(
@@ -39,6 +58,11 @@ async def summarize(
             style=data.style
         )
 
+        result = _normalize_summary_result(
+            result,
+            data
+        )
+
         increment_successful_requests()
 
         log_request(
@@ -46,8 +70,6 @@ async def summarize(
             start_time,
             "SUCCESS"
         )
-
-        from fastapi.responses import JSONResponse
 
         headers = {}
         
