@@ -1,11 +1,10 @@
-import { useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileQuestion, Sparkles } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 
 import { BookmarkButton } from '@/components/bookmark-button';
 import { DownloadPdfButton } from '@/components/download-pdf-button';
-import { CommentThread } from '@/components/editor/comment-thread';
 import { SanitizedHtml } from '@/components/sanitized-html';
 import { Seo } from '@/components/seo';
 import { SocialShare } from '@/components/social-share';
@@ -13,6 +12,31 @@ import { Button, Card, CardBody, Container, EmptyState, Skeleton } from '@/compo
 import { getArticleBySlug } from '@/lib/articles-api';
 import { ARTICLE_CATEGORY_LABELS } from '@/lib/articles-schema';
 import { useArticleAnalytics } from '@/lib/use-article-analytics';
+
+/**
+ * Comments load AFTER the article's first paint (handler-doc guidance:
+ * "defer comments query after main paint"). Two reasons:
+ *   - the section is below the fold, so rendering it inside the article's
+ *     first commit only makes that commit's style/layout task longer — it
+ *     was the page's biggest main-thread block on the v0.5.0 Lighthouse run;
+ *   - lazy() splits the comments code (form, moderation states, API client)
+ *     out of the entry bundle ArticlePage now rides in.
+ * The placeholder mirrors the section's reserved heights so the deferred
+ * mount stays CLS-neutral.
+ */
+const CommentThread = lazy(() =>
+  import('@/components/editor/comment-thread').then((m) => ({ default: m.CommentThread })),
+);
+
+function CommentsPlaceholder(): JSX.Element {
+  return (
+    <div className="mt-10 border-t border-line pt-8">
+      <Skeleton className="h-7 w-44" />
+      <Skeleton className="mt-6 h-28 w-full" />
+      <div className="mt-8 min-h-[12rem]" />
+    </div>
+  );
+}
 
 /**
  * `/article/:slug` — public reader view.
@@ -29,6 +53,12 @@ import { useArticleAnalytics } from '@/lib/use-article-analytics';
 export default function ArticlePage(): JSX.Element {
   const { slug = '' } = useParams<{ slug: string }>();
   const bodyRef = useRef<HTMLDivElement>(null);
+
+  // Flips after the first commit paints — gates the deferred comments mount.
+  const [pastFirstPaint, setPastFirstPaint] = useState(false);
+  useEffect(() => {
+    setPastFirstPaint(true);
+  }, []);
 
   const {
     data: article,
@@ -50,19 +80,46 @@ export default function ArticlePage(): JSX.Element {
   useArticleAnalytics(article?.id, bodyRef);
 
   if (isLoading) {
+    // The skeleton mirrors the loaded page block-for-block — kicker, title,
+    // subtitle, byline, action row, cover, body, comments — at matching
+    // offsets, so the loading→loaded swap doesn't move anything already on
+    // screen. The old header-only skeleton was the page's dominant CLS
+    // source (0.29 of 0.34): the missing byline/action rows meant every
+    // block below them dropped ~90px when content arrived, and the short
+    // overall height left the footer visible mid-viewport before being
+    // shoved off. The body card carries the same min-h floor as the loaded
+    // body so a short article can't collapse the reservation and shift the
+    // page back up.
+    // Deliberately NOT reserved: the AI-summary card — no published article
+    // renders it while the ai-proxy circuit is open. Re-measure CLS when
+    // the AI service merges; if the card returns, add a placeholder here.
     return (
       <Container width="default" className="py-12">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="mt-4 h-10 w-3/4" />
-        <Skeleton className="mt-3 h-4 w-1/2" />
-        <Skeleton className="mt-6 aspect-[16/9] w-full" />
+        <Skeleton className="mt-3 h-5 w-1/2" />
+        <Skeleton className="mt-4 h-4 w-64" />
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Skeleton className="h-9 w-24" />
+          <Skeleton className="h-9 w-36" />
+          <Skeleton className="h-9 w-44" />
+        </div>
+        <Skeleton className="mt-8 aspect-[16/9] w-full" />
         <Card className="mt-8">
-          <CardBody className="space-y-3">
+          <CardBody className="min-h-[40vh] space-y-3">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-11/12" />
             <Skeleton className="h-4 w-10/12" />
           </CardBody>
         </Card>
+        <div className="mt-10 border-t border-line pt-8">
+          <Skeleton className="h-7 w-44" />
+          <Skeleton className="mt-6 h-28 w-full" />
+          <div className="mt-8 min-h-[12rem] space-y-4">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        </div>
       </Container>
     );
   }
@@ -150,6 +207,12 @@ export default function ArticlePage(): JSX.Element {
           src={article.coverImageUrl}
           alt=""
           className="mt-8 aspect-[16/9] w-full rounded-lg object-cover"
+          decoding="async"
+          // The cover is the page's LCP element and, being SPA-rendered, is
+          // only discovered after JS + the article fetch — the priority hint
+          // moves it ahead of other in-flight requests once it is. Lowercase
+          // via spread: React 18 doesn't know the camelCase prop.
+          {...{ fetchpriority: 'high' }}
         />
       ) : null}
 
@@ -169,14 +232,22 @@ export default function ArticlePage(): JSX.Element {
       ) : null}
 
       {/* ─── Body — sanitised on render ─────────────────────────────── */}
+      {/* min-h matches the loading skeleton's body card — see the skeleton
+          comment above for the CLS rationale. */}
       <Card className="mt-8">
-        <CardBody ref={bodyRef}>
+        <CardBody ref={bodyRef} className="min-h-[40vh]">
           <SanitizedHtml html={article.body ?? ''} />
         </CardBody>
       </Card>
 
-      {/* ─── Comments ────────────────────────────────────────────────── */}
-      <CommentThread articleId={article.id} />
+      {/* ─── Comments — deferred past first paint, see CommentThread note ── */}
+      {pastFirstPaint ? (
+        <Suspense fallback={<CommentsPlaceholder />}>
+          <CommentThread articleId={article.id} />
+        </Suspense>
+      ) : (
+        <CommentsPlaceholder />
+      )}
     </Container>
   );
 }

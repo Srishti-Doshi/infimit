@@ -45,8 +45,10 @@ describe('<ArticlePage>', () => {
     // AI summary card pulls from `article.ai.summary`.
     expect(screen.getByText(/adoption is uneven across institutions/i)).toBeInTheDocument();
 
-    // Comments heading from the mounted <CommentThread>.
-    expect(screen.getByRole('heading', { name: /comments/i })).toBeInTheDocument();
+    // Comments heading from the mounted <CommentThread>. findBy*: the
+    // thread mounts a tick after first paint (deferred below-the-fold
+    // section) and arrives via a lazy() chunk.
+    expect(await screen.findByRole('heading', { name: /comments/i })).toBeInTheDocument();
   });
 
   it('renders the not-found state when the slug returns 404', async () => {

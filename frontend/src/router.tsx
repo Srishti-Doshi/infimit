@@ -8,7 +8,10 @@ import ForbiddenPage from '@/pages/forbidden';
 import NotFoundPage from '@/pages/not-found';
 
 // Lazy-loaded route chunks — each becomes its own bundle so the entry chunk
-// stays small.
+// stays small. ArticlePage is lazy like the rest, but main.tsx warm-starts
+// its chunk (and the article API call) at boot on direct /article/:slug
+// loads, so the route-chunk hop runs in parallel with entry execution
+// instead of after it — see the LCP note there.
 const HomePage = lazy(() => import('@/pages/home'));
 const CategoryPage = lazy(() => import('@/pages/category'));
 const ArticlePage = lazy(() => import('@/pages/article'));
@@ -56,8 +59,13 @@ const NewEpaperPage = lazy(() => import('@/pages/dashboard/admin/epapers/new'));
  * The sr-only status line keeps screen readers informed during the gap.
  */
 function RouteFallback(): JSX.Element {
+  // Full-viewport floor, not 50vh: the floor's job is to keep the footer
+  // BELOW the fold while the chunk loads. At 50vh the footer sat
+  // mid-viewport on mobile and was shoved off-screen when the (taller)
+  // destination skeleton mounted — a single 0.29 layout shift that
+  // dominated the article page's CLS on the v0.5.0 Lighthouse gate run.
   return (
-    <div className="min-h-[50vh]" role="status" aria-live="polite">
+    <div className="min-h-screen" role="status" aria-live="polite">
       <span className="sr-only">Loading page</span>
     </div>
   );
