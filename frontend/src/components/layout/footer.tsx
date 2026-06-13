@@ -5,25 +5,22 @@ import { Container } from '@/components/ui';
 
 import { Logo } from './logo';
 
+// Every href below must resolve to a real route — dead footer links are a
+// crawl/SEO liability and a reader dead-end. Phantom Subphase 1 entries
+// (Newsletters, Podcasts, Blog, Cookie Policy, …) were trimmed in 5-fe-2;
+// restore each one only when its page actually ships.
 const COLUMNS = [
   {
     title: 'Service',
     links: [
       { label: 'E-Paper', href: '/epaper' },
-      { label: 'Newsletters', href: '/newsletters' },
-      { label: 'Comments', href: '/comments' },
-      { label: 'Delve', href: '/delve' },
-      { label: 'Podcasts', href: '/podcasts' },
+      { label: 'Search', href: '/search' },
     ],
   },
   {
     title: 'Company',
     links: [
       { label: 'About', href: '/about' },
-      { label: 'Features', href: '/features' },
-      { label: 'Our Team', href: '/team' },
-      { label: 'Portfolio', href: '/portfolio' },
-      { label: 'Blog', href: '/blog' },
       { label: 'Contact', href: '/contact' },
     ],
   },
@@ -32,8 +29,6 @@ const COLUMNS = [
     links: [
       { label: 'Privacy Policy', href: '/legal/privacy' },
       { label: 'Terms of Service', href: '/legal/terms' },
-      { label: 'Cookie Policy', href: '/legal/cookies' },
-      { label: 'Disclaimer', href: '/legal/disclaimer' },
     ],
   },
 ];

@@ -33,7 +33,7 @@ describe('useRoleNav', () => {
     expect(result.current.roleLabel).toBe('Reader');
     expect(result.current.items.map((i) => i.label)).toEqual([
       'Home',
-      'My library',
+      'Bookmarks',
       'Notifications',
       'Profile',
     ]);
@@ -47,6 +47,8 @@ describe('useRoleNav', () => {
       'Home',
       'My drafts',
       'My submissions',
+      'Published',
+      'Bookmarks',
       'Notifications',
       'Profile',
     ]);
@@ -61,6 +63,8 @@ describe('useRoleNav', () => {
       'Approvals queue',
       'Pending comments',
       'My drafts',
+      'Published',
+      'Bookmarks',
       'Notifications',
       'Profile',
     ]);
@@ -83,6 +87,7 @@ describe('useRoleNav', () => {
       'Organisations',
       'E-papers',
       'My drafts',
+      'Bookmarks',
       'Notifications',
       'Profile',
     ]);

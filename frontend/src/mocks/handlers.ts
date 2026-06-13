@@ -1,11 +1,13 @@
 import { http, HttpResponse } from 'msw';
 
+import type { Bookmark } from '@/types/bookmark';
 import type { Epaper } from '@/types/epaper';
 
 import {
   mockCategories,
   mockComments,
   mockDrafts,
+  mockBookmarks,
   mockEpaperIssues,
   mockHomeFeed,
   mockNotifications,
@@ -116,6 +118,15 @@ let mockEpaperIssuesState: Epaper[] = [...mockEpaperIssues];
 let nextEpaperId = 100;
 
 /**
+ * Mutable bookmarks list — POST and DELETE per session mutate this in
+ * place. Reset on `__resetMocks`. The real backend scopes by `req.user.id`;
+ * the mock always operates on the single seeded `mockUser`, which is fine
+ * for the page-level / button-level FE tests this stub serves.
+ */
+let mockBookmarksState: Bookmark[] = [...mockBookmarks];
+let nextBookmarkId = 100;
+
+/**
  * Single-row moderation helper used by the three comment-action handlers
  * (approve / reject / hide). Returns the same response envelope the real
  * backend does, including `moderatedBy` / `moderatedAt` provenance fields
@@ -167,6 +178,8 @@ export function __resetMocks(): void {
   mockNotificationsState = [...mockNotifications];
   mockEpaperIssuesState = [...mockEpaperIssues];
   nextEpaperId = 100;
+  mockBookmarksState = [...mockBookmarks];
+  nextBookmarkId = 100;
 }
 
 /**
@@ -886,8 +899,54 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
+  // ── Analytics ──────────────────────────────────────────────────────────
+  //
+  // Fire-and-forget tracker: the real BE acks 204 before persisting, accepts
+  // both anonymous (sessionId) and authed requests, and never errors a
+  // reader flow. The mock mirrors that: always 204, no validation.
+  http.post(`${BASE}/analytics/track`, () => new HttpResponse(null, { status: 204 })),
+
   // ── Bookmarks ──────────────────────────────────────────────────────────
-  http.get(`${BASE}/bookmarks`, () => err('UNAUTHORIZED', 'Sign in to view bookmarks', 401)),
+  //
+  // Real backend scopes by `req.user.id`; mock always operates on the seeded
+  // mockUser. POST is idempotent — repeated calls return the same row and
+  // never duplicate. DELETE returns 204 either way.
+  http.get(`${BASE}/bookmarks`, ({ request }) => {
+    if (!hasBearer(request)) return err('UNAUTHORIZED', 'Sign in to view bookmarks', 401);
+    return ok({
+      items: mockBookmarksState,
+      total: mockBookmarksState.length,
+      page: 1,
+      limit: 100,
+    });
+  }),
+
+  http.post(`${BASE}/bookmarks/:articleId`, ({ request, params }) => {
+    if (!hasBearer(request)) return err('UNAUTHORIZED', 'Sign in to save articles', 401);
+    const articleId = params.articleId as string;
+    const existing = mockBookmarksState.find((b) => b.articleId === articleId);
+    if (existing) return ok({ bookmark: existing });
+
+    // Default mock creates a stub bookmark with `article: null` — tests that
+    // assert on the card body should override this handler with the
+    // matching FeedCard projection.
+    nextBookmarkId += 1;
+    const newBookmark: Bookmark = {
+      id: `bm_${nextBookmarkId.toString().padStart(3, '0')}`,
+      articleId,
+      createdAt: new Date().toISOString(),
+      article: null,
+    };
+    mockBookmarksState = [newBookmark, ...mockBookmarksState];
+    return ok({ bookmark: newBookmark });
+  }),
+
+  http.delete(`${BASE}/bookmarks/:articleId`, ({ request, params }) => {
+    if (!hasBearer(request)) return err('UNAUTHORIZED', 'Sign in to remove bookmarks', 401);
+    const articleId = params.articleId as string;
+    mockBookmarksState = mockBookmarksState.filter((b) => b.articleId !== articleId);
+    return new HttpResponse(null, { status: 204 });
+  }),
 
   // ── Notifications ──────────────────────────────────────────────────────
   // ── Notifications ──────────────────────────────────────────────────────
