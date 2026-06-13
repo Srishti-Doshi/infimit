@@ -135,7 +135,9 @@ export function CommentThread({ articleId }: CommentThreadProps): JSX.Element {
         <Card className="mt-6 bg-surface-subtle">
           <CardBody className="py-6 text-center">
             <p className="text-body-sm text-ink-secondary">
-              <Link to="/auth/login" className="text-brand-red-600 hover:underline">
+              {/* In-text links carry an underline — colour alone isn't a
+                  distinguisher for colour-blind readers (WCAG 1.4.1). */}
+              <Link to="/auth/login" className="text-brand-red-600 underline underline-offset-2">
                 Sign in
               </Link>{' '}
               to leave a comment.
@@ -145,7 +147,10 @@ export function CommentThread({ articleId }: CommentThreadProps): JSX.Element {
       )}
 
       {/* ─── existing approved comments ──────────────────────────────── */}
-      <div className="mt-8 space-y-4">
+      {/* The floor holds the list area at one height across the query's
+          loading→loaded swap so the footer doesn't jump (CLS). It applies to
+          both states — skeletons and the loaded list sit in the same box. */}
+      <div className="mt-8 min-h-[12rem] space-y-4">
         {isLoading ? (
           <>
             <CommentSkeleton />
