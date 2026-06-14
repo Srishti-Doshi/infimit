@@ -72,7 +72,12 @@ export const CardDescription = forwardRef<
 
 export const CardBody = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   function CardBody({ className, ...props }, ref) {
-    return <div ref={ref} className={cn('p-6 pt-0', className)} {...props} />;
+    // Full `p-6` (top included). The composition pattern that justified `pt-0`
+    // (a preceding `<CardHeader>` supplying the top padding) is not used
+    // anywhere — every CardBody is standalone, so `pt-0` left content jammed
+    // against the card's top edge on every surface. Call sites that want a
+    // full-bleed body still override with `className="p-0"` (tailwind-merge).
+    return <div ref={ref} className={cn('p-6', className)} {...props} />;
   },
 );
 

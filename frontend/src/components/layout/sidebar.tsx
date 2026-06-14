@@ -9,9 +9,7 @@ import {
   Linkedin,
   LogOut,
   Mail,
-  Newspaper,
   Search,
-  Send,
   Twitter,
   X,
 } from 'lucide-react';
@@ -21,9 +19,11 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Button, Input, toast } from '@/components/ui';
 import { logout } from '@/lib/auth-api';
 import { cn } from '@/lib/cn';
+import { ARTICLE_CATEGORY_LABELS } from '@/lib/articles-schema';
 import { useRoleNav } from '@/lib/use-role-nav';
 import { useAuthStore } from '@/store/auth-store';
 import { useUIStore } from '@/store';
+import { ARTICLE_CATEGORIES } from '@/types/article';
 
 import { WriteArticleButton } from './write-article-button';
 
@@ -37,21 +37,18 @@ interface NavItem {
 
 const PRIMARY_ITEMS: NavItem[] = [
   { label: 'Home', href: '/', icon: Home, end: true },
-  { label: 'Latest News', href: '/category/latest', icon: Newspaper },
-  { label: 'Submit News', href: '/submit', icon: Send },
   { label: 'E-paper', href: '/epaper', icon: BookOpen },
   { label: 'About Us', href: '/about', icon: Info },
   { label: 'Contact Us', href: '/contact', icon: Mail },
 ];
 
-const CATEGORY_ITEMS: NavItem[] = [
-  { label: 'India', href: '/category/india', icon: FileText },
-  { label: 'World', href: '/category/world', icon: FileText },
-  { label: 'Sport', href: '/category/sport', icon: FileText },
-  { label: 'Health', href: '/category/health', icon: FileText },
-  { label: 'Science', href: '/category/science', icon: FileText },
-  { label: 'Opinion', href: '/category/opinion', icon: FileText },
-];
+// Derived from the 5-category enum so every link resolves to a real category
+// page (the category route validates the slug against ARTICLE_CATEGORIES).
+const CATEGORY_ITEMS: NavItem[] = ARTICLE_CATEGORIES.map((category) => ({
+  label: ARTICLE_CATEGORY_LABELS[category],
+  href: `/category/${category}`,
+  icon: FileText,
+}));
 
 const SOCIAL_LINKS = [
   { label: 'Facebook', href: '#', icon: Facebook },

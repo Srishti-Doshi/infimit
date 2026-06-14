@@ -318,7 +318,9 @@ function diffWireState(current: SavedWireState, last: SavedWireState): Partial<S
   if (current.category !== last.category) patch.category = current.category;
   if (JSON.stringify(current.tags) !== JSON.stringify(last.tags)) patch.tags = current.tags;
   if (current.body !== last.body) patch.body = current.body;
-  if (current.plainText !== last.plainText) patch.plainText = current.plainText;
+  // NOTE: plainText is intentionally NOT diffed/sent — the backend derives it
+  // from the body and ignores the client value. Sending a plainText-only diff
+  // PATCHes a body the validator strips → empty update → 422. See edit.tsx.
   if (current.coverImageMediaId !== last.coverImageMediaId) {
     patch.coverImageMediaId = current.coverImageMediaId;
   }
