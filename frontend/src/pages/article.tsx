@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileQuestion, Sparkles } from 'lucide-react';
+import { ChevronDown, FileQuestion, Sparkles } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 
+import { AiSummary } from '@/components/ai-summary';
 import { BookmarkButton } from '@/components/bookmark-button';
 import { DownloadPdfButton } from '@/components/download-pdf-button';
 import { SanitizedHtml } from '@/components/sanitized-html';
@@ -59,6 +60,12 @@ export default function ArticlePage(): JSX.Element {
   useEffect(() => {
     setPastFirstPaint(true);
   }, []);
+
+  // The AI summary is precomputed at approval (stored on the article), so
+  // showing it costs no API call — but it's collapsed by default so it doesn't
+  // crowd the reader who came for the article itself. Disclosure, not a
+  // generate-on-demand button (the summary already exists + powers SEO).
+  const [showSummary, setShowSummary] = useState(false);
 
   const {
     data: article,
@@ -216,18 +223,47 @@ export default function ArticlePage(): JSX.Element {
         />
       ) : null}
 
-      {/* ─── AI summary (reader variant — no regenerate button) ───────── */}
+      {/* ─── AI summary (reader variant — premium collapsed disclosure) ─── */}
       {aiSummary ? (
-        <Card className="mt-8 border-brand-red-50 bg-brand-red-50/30">
-          <CardBody>
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-brand-red-500" aria-hidden="true" />
-              <h2 className="font-display text-body-lg font-semibold text-ink-primary">
+        <Card className="mt-8 overflow-hidden border-brand-red-100 bg-gradient-to-br from-brand-red-50 to-brand-red-50/30">
+          <button
+            type="button"
+            onClick={() => setShowSummary((open) => !open)}
+            aria-expanded={showSummary}
+            aria-controls="ai-summary-content"
+            className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-brand-red-50 focus-visible:bg-brand-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red-500/50"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-red-100 text-brand-red-600">
+              <Sparkles className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-display text-body-lg font-semibold leading-tight text-ink-primary">
                 AI summary
-              </h2>
-            </div>
-            <p className="mt-2 text-body-base text-ink-primary">{aiSummary}</p>
-          </CardBody>
+              </span>
+              <span className="block text-body-xs text-ink-tertiary">
+                Key points, summarized in seconds
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5 text-body-sm font-semibold text-brand-red-600">
+              <span className="hidden sm:inline">{showSummary ? 'Hide' : 'Show'}</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 shadow-sm">
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${showSummary ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+              </span>
+            </span>
+          </button>
+          {/* Kept mounted (toggled via `hidden`) so it stays in the DOM for
+              crawlers and aria-controls stays valid; SEO meta/JSON-LD use the
+              summary regardless. */}
+          <div
+            id="ai-summary-content"
+            hidden={!showSummary}
+            className="border-t border-brand-red-100 px-5 pb-5 pt-4"
+          >
+            <AiSummary text={aiSummary} />
+          </div>
         </Card>
       ) : null}
 
