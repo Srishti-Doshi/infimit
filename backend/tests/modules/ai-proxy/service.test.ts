@@ -28,6 +28,7 @@ const VALID_RESPONSE = {
 beforeEach(() => {
   process.env.AI_SERVICE_URL = AI_BASE;
   process.env.AI_INTERNAL_KEY = 'test-internal-key';
+  process.env.AI_REQUEST_TIMEOUT_MS = '2000';
   resetEnvForTests();
   resetAiProxyForTests();
   nock.cleanAll();
@@ -170,5 +171,23 @@ describe('aiProxy.summarize — circuit breaker', () => {
     expect(fallback.degraded).toBe(true);
     expect(fallback.model).toBe('circuit-open');
     expect(fallback.summary).toBe('');
+  });
+});
+
+describe('aiProxy.summarize — timeout is env-driven (AI_REQUEST_TIMEOUT_MS)', () => {
+  it('falls back when the response is slower than AI_REQUEST_TIMEOUT_MS', async () => {
+    // Tight budget; the response arrives well after it. Pre-fix the timeout was
+    // hardcoded at 2000ms, so this 300ms-delayed reply would NOT trip it and
+    // the call would succeed — this test fails on the old code and passes once
+    // AI_REQUEST_TIMEOUT_MS is wired into both the axios client and the breaker.
+    process.env.AI_REQUEST_TIMEOUT_MS = '50';
+    resetEnvForTests();
+    resetAiProxyForTests();
+    nock(AI_BASE).post('/v1/summarize').delay(300).times(5).reply(200, VALID_RESPONSE);
+
+    const result = await aiProxy.summarize('text');
+    expect(result.degraded).toBe(true);
+    expect(result.model).toBe('circuit-open');
+    expect(result.summary).toBe('');
   });
 });

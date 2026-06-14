@@ -52,7 +52,11 @@ const EnvSchema = z.object({
   // AI service
   AI_SERVICE_URL: z.string().url().default('http://localhost:8000'),
   AI_INTERNAL_KEY: z.string().min(1).default('dev-internal-key'),
-  AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
+  // 10s default suits the merged AI service (remote Groq LLM, ~1-2s/call).
+  // The original 2s assumed a local BART model; a cold call measured ~1.6s,
+  // too thin against a 2s ceiling. Wired into the ai-proxy axios client AND
+  // the opossum breaker (modules/ai-proxy/service.ts).
+  AI_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
 
   // S3 / object store — Subphase 3 wires presigned uploads.
   // Dev/test point at MinIO via docker-compose.dev.yml (S3_FORCE_PATH_STYLE=true,
