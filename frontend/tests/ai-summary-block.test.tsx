@@ -108,7 +108,7 @@ describe('<AISummaryBlock>', () => {
       />,
     );
 
-    expect(screen.getByText(/fallback summary — regenerate to retry/i)).toBeInTheDocument();
+    expect(screen.getByText(/auto-summary unavailable/i)).toBeInTheDocument();
     expect(screen.getByText(/circuit-open/i)).toBeInTheDocument();
   });
 
@@ -136,21 +136,46 @@ describe('<AISummaryBlock>', () => {
     );
 
     expect(screen.getByRole('heading', { name: /ai summary/i })).toBeInTheDocument();
-    expect(screen.getByText(/fallback summary — regenerate to retry/i)).toBeInTheDocument();
+    expect(screen.getByText(/auto-summary unavailable/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/ai service couldn't generate a summary.*click regenerate to retry/i),
+      screen.getByText(/ai service was unreachable.*click regenerate to retry/i),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /regenerate/i })).toBeEnabled();
   });
 
-  it('shows the awaiting-pipeline copy when approved but ai.summary is empty', () => {
+  it('shows the in-progress copy when approved, summary empty, and not degraded', () => {
     renderWithProviders(
       <AISummaryBlock article={makeArticle({ status: 'approved', ai: undefined })} />,
     );
 
-    expect(
-      screen.getByText(/ai pipeline is still running.*refresh in a moment/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/still being generated.*refresh in a moment/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /regenerate/i })).toBeEnabled();
+  });
+
+  // #48: status 'approved' + degraded + empty summary is the real post-approve
+  // degraded window. Pre-fix `isAwaitingPipeline` was true here, so the block
+  // showed BOTH the "still generating" copy AND the degraded badge at once.
+  // Now degraded is excluded from the in-progress check, so they're distinct.
+  it('shows completed-degraded (not in-progress) when approved + degraded + empty', () => {
+    renderWithProviders(
+      <AISummaryBlock
+        article={makeArticle({
+          status: 'approved',
+          ai: {
+            summary: '',
+            keywords: [],
+            readingTimeMin: 0,
+            ttsAudioUrl: null,
+            degraded: true,
+            model: 'circuit-open',
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText(/auto-summary unavailable/i)).toBeInTheDocument();
+    expect(screen.getByText(/ai service was unreachable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/still being generated/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /regenerate/i })).toBeEnabled();
   });
 

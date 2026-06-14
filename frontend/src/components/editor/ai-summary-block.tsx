@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertTriangle, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 
+import { AiSummary } from '@/components/ai-summary';
 import { Button, Card, CardBody, toast } from '@/components/ui';
 import { regenerateArticleSummary } from '@/lib/articles-api';
 import { toastError } from '@/lib/error-messages';
@@ -19,19 +20,23 @@ interface AISummaryBlockProps {
  *   - Not rendered for drafts / submitted articles — AI hasn't run yet.
  *   - Rendered for approved / published / unpublished if `article.ai.summary`
  *     is non-empty.
- *   - Rendered with a "running" placeholder state when AI is still in flight
- *     (status === 'approved' but `ai.summary` empty) — the approve handler
- *     fires the pipeline asynchronously, so there's a window where the
- *     editor sees the approve toast but no summary yet.
+ *   - Rendered with an in-progress placeholder (spinner) when the pipeline is
+ *     still in flight (status === 'approved', summary empty, and NOT degraded)
+ *     — the approve handler fires the pipeline asynchronously, so there's a
+ *     window where the editor sees the approve toast but no summary yet.
  *   - Rendered with the degraded badge + retry message when
  *     `ai.degraded === true` even if `ai.summary` is empty — surfaces the
  *     circuit-open state to the editor so they can hit Regenerate instead
- *     of staring at a silently-missing block. Pins #75.
+ *     of staring at a silently-missing block. Pins #75. Because degraded
+ *     means the pipeline FINISHED (in fallback mode), it is excluded from the
+ *     in-progress check above, so "in progress" and "completed degraded"
+ *     never render at once (#48).
  *
  * Degraded UX (per FE handler doc §4):
- *   - `ai.degraded === true` shows a subtle inline warning badge "Fallback
- *     summary — regenerate to retry". Editor knows the BART model didn't
- *     respond; the text is the opossum circuit's fallback.
+ *   - `ai.degraded === true` shows a subtle "Auto-summary unavailable" badge.
+ *     Degraded means the ai-proxy circuit was open (the AI service was
+ *     unreachable at approve time), so the summary is empty — the editor hits
+ *     Regenerate to retry.
  *   - Force-regenerate ALWAYS sends `force: true` and bypasses cache.
  *   - On `AI_UNAVAILABLE` (503), `toastError` surfaces the user-facing copy
  *     from error-messages.ts. We don't add a custom toast for it — the
@@ -57,7 +62,10 @@ export function AISummaryBlock({ article }: AISummaryBlockProps): JSX.Element | 
 
   const ai = article.ai;
   const hasSummary = Boolean(ai?.summary);
-  const isAwaitingPipeline = article.status === 'approved' && !hasSummary;
+  // Degraded means the pipeline FINISHED in fallback mode, so it is NOT
+  // awaiting — excluding it is what lets the body tell in-progress apart from
+  // completed-degraded (#48).
+  const isAwaitingPipeline = article.status === 'approved' && !hasSummary && !ai?.degraded;
 
   // Don't render for pre-approval states.
   if (
@@ -96,14 +104,16 @@ export function AISummaryBlock({ article }: AISummaryBlockProps): JSX.Element | 
 
         <div className="mt-3">
           {isAwaitingPipeline ? (
-            <p className="text-body-base italic text-ink-tertiary">
-              The AI pipeline is still running. Refresh in a moment, or click Regenerate to retry.
+            <p className="flex items-center gap-2 text-body-base italic text-ink-tertiary">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              The AI summary is still being generated — refresh in a moment, or use Regenerate.
             </p>
           ) : hasSummary ? (
-            <p className="text-body-base text-ink-primary">{ai?.summary}</p>
+            <AiSummary text={ai?.summary ?? ''} />
           ) : (
             <p className="text-body-base italic text-ink-tertiary">
-              The AI service couldn&apos;t generate a summary. Click Regenerate to retry.
+              The AI service was unreachable, so no summary is available yet. Click Regenerate to
+              retry.
             </p>
           )}
         </div>
@@ -131,7 +141,7 @@ function DegradedBadge(): JSX.Element {
       className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-body-xs font-medium text-yellow-800"
     >
       <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-      Fallback summary — regenerate to retry
+      Auto-summary unavailable
     </span>
   );
 }

@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
@@ -42,13 +43,29 @@ describe('<ArticlePage>', () => {
     expect(screen.getByText(/by demo reader/i)).toBeInTheDocument();
     expect(screen.getByText(/research & innovation/i)).toBeInTheDocument();
 
-    // AI summary card pulls from `article.ai.summary`.
+    // AI summary card pulls from `article.ai.summary` (collapsed by default,
+    // so present in the DOM but not visible until expanded — see toggle test).
     expect(screen.getByText(/adoption is uneven across institutions/i)).toBeInTheDocument();
 
     // Comments heading from the mounted <CommentThread>. findBy*: the
     // thread mounts a tick after first paint (deferred below-the-fold
     // section) and arrives via a lazy() chunk.
     expect(await screen.findByRole('heading', { name: /comments/i })).toBeInTheDocument();
+  });
+
+  it('keeps the AI summary collapsed by default and reveals it on click', async () => {
+    const user = userEvent.setup();
+    renderAt('how-indian-campuses-adopted-ai-tutoring');
+
+    const toggle = await screen.findByRole('button', { name: /ai summary/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // Mounted for SEO/crawlers + valid aria-controls, but hidden until opened.
+    const summary = screen.getByText(/adoption is uneven across institutions/i);
+    expect(summary).not.toBeVisible();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(summary).toBeVisible();
   });
 
   it('renders the not-found state when the slug returns 404', async () => {
