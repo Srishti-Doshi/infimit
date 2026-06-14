@@ -101,7 +101,11 @@ function diffWireState(current: SavedWireState, last: SavedWireState): Partial<S
   if (current.category !== last.category) patch.category = current.category;
   if (JSON.stringify(current.tags) !== JSON.stringify(last.tags)) patch.tags = current.tags;
   if (current.body !== last.body) patch.body = current.body;
-  if (current.plainText !== last.plainText) patch.plainText = current.plainText;
+  // NOTE: plainText is intentionally NOT diffed/sent. The backend derives it
+  // from the sanitized body (service.ts) and ignores any client value, so a
+  // spurious plainText-only change (Tiptap re-derives it on mount) would PATCH
+  // a body the validator strips → empty update → 422 "At least one field must
+  // be updated". Skipping it means body remains the single source of truth.
   if (current.coverImageMediaId !== last.coverImageMediaId) {
     patch.coverImageMediaId = current.coverImageMediaId;
   }

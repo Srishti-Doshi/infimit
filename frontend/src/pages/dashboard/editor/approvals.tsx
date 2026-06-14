@@ -4,15 +4,17 @@ import type { ReactNode } from 'react';
 
 import { ApprovalQueueRow } from '@/components/editor/approval-queue-row';
 import { Card, CardBody, Container, EmptyState, Skeleton } from '@/components/ui';
-import { listSubmittedArticles } from '@/lib/articles-api';
+import { listArticles } from '@/lib/articles-api';
 
 /**
  * `/dashboard/editor/approvals` — Subphase 4 editor surface.
  *
- * Lists every submitted article waiting on editorial review. Backend
- * authoritatively scopes editors to their `sectionsOwned`; admins see
- * everything. We don't second-guess the scope here — what the backend
- * returns IS the queue.
+ * Lists articles needing an editorial decision: `submitted` (awaiting
+ * approve/reject) AND `approved` (awaiting publish). Without the latter, an
+ * approved article dropped out of the only list that links to its preview —
+ * stranding it with no UI path to Publish. Backend authoritatively scopes
+ * editors to their `sectionsOwned`; admins see everything. We don't
+ * second-guess the scope here — what the backend returns IS the queue.
  *
  * Future: tabs (All / My section / Other sections), category + dateRange
  * filters, infinite scroll. None of those require new endpoints; backend
@@ -22,7 +24,7 @@ import { listSubmittedArticles } from '@/lib/articles-api';
 export default function ApprovalsPage(): JSX.Element {
   const { data, isLoading } = useQuery({
     queryKey: ['articles', 'approvals'],
-    queryFn: () => listSubmittedArticles(),
+    queryFn: () => listArticles({ status: ['submitted', 'approved'] }),
   });
 
   const items = data?.items ?? [];
@@ -34,8 +36,8 @@ export default function ApprovalsPage(): JSX.Element {
           Approval queue
         </h1>
         <p className="mt-2 text-body-base text-ink-secondary">
-          Submitted articles waiting on editorial review. Click a row to open the preview and
-          approve, reject, or publish.
+          Submitted articles awaiting review, plus approved articles ready to publish. Click a row
+          to open the preview and approve, reject, or publish.
         </p>
       </header>
 
@@ -47,7 +49,7 @@ export default function ApprovalsPage(): JSX.Element {
             <EmptyState
               icon={<Inbox className="h-6 w-6" aria-hidden="true" />}
               title="Inbox zero"
-              description="No submissions are waiting for review right now."
+              description="Nothing is waiting for an editorial decision right now."
             />
           ) : (
             <table className="min-w-full divide-y divide-line">

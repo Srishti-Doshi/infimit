@@ -143,6 +143,8 @@ interface DemoArticleSeed {
   tags: string[];
   body: string;
   summary: string;
+  /** Topical cover image (Unsplash CDN) — shown as the article's cover. */
+  coverUrl: string;
 }
 
 /**
@@ -176,6 +178,8 @@ const DEMO_ARTICLES: DemoArticleSeed[] = [
     summary:
       'New national curriculum centres computational thinking and pairs subject content with ' +
       'mandatory teacher development. Unions push for a phased rollout.',
+    coverUrl:
+      'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1600&q=80&auto=format&fit=crop',
   },
   {
     slug: 'state-university-on-campus-startups',
@@ -195,6 +199,8 @@ const DEMO_ARTICLES: DemoArticleSeed[] = [
     summary:
       'A campus venture lab pairs seed grants and mentor access with cross-discipline ' +
       'collaboration; three student teams have already launched paying products.',
+    coverUrl:
+      'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1600&q=80&auto=format&fit=crop',
   },
   {
     slug: 'transformer-tutors-classroom-trial',
@@ -215,20 +221,25 @@ const DEMO_ARTICLES: DemoArticleSeed[] = [
     summary:
       'A six-school LLM-tutor pilot narrowed the homework-attainment gap, with the largest ' +
       'gains concentrated in households without home internet.',
+    coverUrl:
+      'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=1600&q=80&auto=format&fit=crop',
   },
 ];
 
 async function seedDemoCover(uploadedBy: string): Promise<string> {
-  // A single shared "demo cover" media doc — every demo article points at it.
-  // refCount is set to 3 to match the three articles that reference it; the
-  // GC sweeper won't touch a non-zero refCount even after the TTL.
+  // A single shared "demo cover" media doc that every demo article references
+  // via `coverImageMediaId` (referential integrity + refCount). The displayed
+  // cover is each article's own `coverUrl`; this doc carries a real
+  // representative image — NOT the old `mock-cdn.test` placeholder, which 404'd
+  // and rendered a broken-image icon on every seeded article.
+  // refCount matches the three referencing articles so the GC sweeper skips it.
   const existing = await Media.findOne({ key: 'seed/demo-cover.jpg' }).exec();
   if (existing) {
     return existing._id.toString();
   }
   const doc = await Media.create({
     key: 'seed/demo-cover.jpg',
-    url: 'https://mock-cdn.test/seed/demo-cover.jpg',
+    url: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1600&q=80&auto=format&fit=crop',
     mimeType: 'image/jpeg',
     size: 100_000,
     purpose: 'article_cover',
@@ -261,7 +272,7 @@ async function seedDemoArticle(
     authorId: new Types.ObjectId(authorId),
     organisationId: new Types.ObjectId(organisationId),
     coverImageMediaId: new Types.ObjectId(coverMediaId),
-    coverImageUrl: 'https://mock-cdn.test/seed/demo-cover.jpg',
+    coverImageUrl: seed.coverUrl,
     media: [new Types.ObjectId(coverMediaId)],
     status: 'published',
     publishedAt: now,

@@ -13,6 +13,7 @@ import { Button, Card, CardBody, Container, EmptyState, Skeleton } from '@/compo
 import { getArticleBySlug } from '@/lib/articles-api';
 import { ARTICLE_CATEGORY_LABELS } from '@/lib/articles-schema';
 import { useArticleAnalytics } from '@/lib/use-article-analytics';
+import { useAuthStore } from '@/store/auth-store';
 
 /**
  * Comments load AFTER the article's first paint (handler-doc guidance:
@@ -66,6 +67,11 @@ export default function ArticlePage(): JSX.Element {
   // crowd the reader who came for the article itself. Disclosure, not a
   // generate-on-demand button (the summary already exists + powers SEO).
   const [showSummary, setShowSummary] = useState(false);
+
+  // AI summaries are a member benefit — readers must sign in to read them. The
+  // card is gated below; the SEO meta/JSON-LD still use the summary (crawlers
+  // are always anonymous, and the gate is an engagement nudge, not a hard wall).
+  const user = useAuthStore((s) => s.user);
 
   const {
     data: article,
@@ -223,48 +229,80 @@ export default function ArticlePage(): JSX.Element {
         />
       ) : null}
 
-      {/* ─── AI summary (reader variant — premium collapsed disclosure) ─── */}
+      {/* ─── AI summary (reader variant) — gated behind sign-in ─────────── */}
       {aiSummary ? (
-        <Card className="mt-8 overflow-hidden border-brand-red-100 bg-gradient-to-br from-brand-red-50 to-brand-red-50/30">
-          <button
-            type="button"
-            onClick={() => setShowSummary((open) => !open)}
-            aria-expanded={showSummary}
-            aria-controls="ai-summary-content"
-            className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-brand-red-50 focus-visible:bg-brand-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red-500/50"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-red-100 text-brand-red-600">
-              <Sparkles className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-display text-body-lg font-semibold leading-tight text-ink-primary">
-                AI summary
+        user ? (
+          <Card className="mt-8 overflow-hidden border-brand-red-100 bg-gradient-to-br from-brand-red-50 to-brand-red-50/30">
+            <button
+              type="button"
+              onClick={() => setShowSummary((open) => !open)}
+              aria-expanded={showSummary}
+              aria-controls="ai-summary-content"
+              className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-brand-red-50 focus-visible:bg-brand-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red-500/50"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-red-100 text-brand-red-600">
+                <Sparkles className="h-5 w-5" aria-hidden="true" />
               </span>
-              <span className="block text-body-xs text-ink-tertiary">
-                Key points, summarized in seconds
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-body-lg font-semibold leading-tight text-ink-primary">
+                  AI summary
+                </span>
+                <span className="block text-body-xs text-ink-tertiary">
+                  Key points, summarized in seconds
+                </span>
               </span>
-            </span>
-            <span className="flex shrink-0 items-center gap-1.5 text-body-sm font-semibold text-brand-red-600">
-              <span className="hidden sm:inline">{showSummary ? 'Hide' : 'Show'}</span>
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 shadow-sm">
-                <ChevronDown
-                  className={`h-4 w-4 transition-transform ${showSummary ? 'rotate-180' : ''}`}
-                  aria-hidden="true"
-                />
+              <span className="flex shrink-0 items-center gap-1.5 text-body-sm font-semibold text-brand-red-600">
+                <span className="hidden sm:inline">{showSummary ? 'Hide' : 'Show'}</span>
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 shadow-sm">
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${showSummary ? 'rotate-180' : ''}`}
+                    aria-hidden="true"
+                  />
+                </span>
               </span>
-            </span>
-          </button>
-          {/* Kept mounted (toggled via `hidden`) so it stays in the DOM for
-              crawlers and aria-controls stays valid; SEO meta/JSON-LD use the
-              summary regardless. */}
-          <div
-            id="ai-summary-content"
-            hidden={!showSummary}
-            className="border-t border-brand-red-100 px-5 pb-5 pt-4"
-          >
-            <AiSummary text={aiSummary} />
-          </div>
-        </Card>
+            </button>
+            {/* Kept mounted (toggled via `hidden`) so it stays in the DOM for
+                crawlers and aria-controls stays valid; SEO meta/JSON-LD use the
+                summary regardless. */}
+            <div
+              id="ai-summary-content"
+              hidden={!showSummary}
+              className="border-t border-brand-red-100 px-5 pb-5 pt-4"
+            >
+              <AiSummary text={aiSummary} />
+            </div>
+          </Card>
+        ) : (
+          /* Logged-out readers get a compact single-row locked teaser — title +
+             prompt on the left, sign-in CTAs on the right; wraps on mobile. */
+          <Card className="mt-8 overflow-hidden border-brand-red-100 bg-gradient-to-br from-brand-red-50 to-brand-red-50/30">
+            <div className="flex flex-wrap items-center gap-3 px-5 py-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-red-100 text-brand-red-600">
+                <Sparkles className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-body-lg font-semibold leading-tight text-ink-primary">
+                  AI summary
+                </span>
+                <span className="block text-body-xs text-ink-tertiary">
+                  Sign in to read the key points, summarized in seconds.
+                </span>
+              </span>
+              <div className="flex shrink-0 items-center gap-2">
+                <Link to="/auth/login">
+                  <Button variant="primary" size="sm">
+                    Sign in
+                  </Button>
+                </Link>
+                <Link to="/auth/register">
+                  <Button variant="outline" size="sm">
+                    Create account
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </Card>
+        )
       ) : null}
 
       {/* ─── Body — sanitised on render ─────────────────────────────── */}

@@ -2,19 +2,17 @@ import { NavLink } from 'react-router-dom';
 
 import { Container } from '@/components/ui';
 import { cn } from '@/lib/cn';
+import { ARTICLE_CATEGORY_LABELS } from '@/lib/articles-schema';
+import { ARTICLE_CATEGORIES } from '@/types/article';
 
-const NAV_ITEMS = [
-  { label: 'India', href: '/category/india' },
-  { label: 'Elections', href: '/category/elections' },
-  { label: 'World', href: '/category/world' },
-  { label: 'Sport', href: '/category/sport' },
-  { label: 'Data', href: '/category/data' },
-  { label: 'Health', href: '/category/health' },
-  { label: 'Opinion', href: '/category/opinion' },
-  { label: 'Science', href: '/category/science' },
-  { label: 'Entertainment', href: '/category/entertainment' },
-  { label: 'Premium', href: '/premium', accent: true },
-] as const;
+// Derived from the single source of truth (the 5-category enum) so the nav
+// always links to real, resolvable category pages. The category route
+// validates the slug directly against ARTICLE_CATEGORIES, so the href must be
+// the enum value (e.g. `/category/education_policy`).
+const NAV_ITEMS = ARTICLE_CATEGORIES.map((category) => ({
+  label: ARTICLE_CATEGORY_LABELS[category],
+  href: `/category/${category}`,
+}));
 
 /**
  * PrimaryNav — top-level category navigation. Shown inline on lg+ only;
@@ -42,11 +40,6 @@ export function PrimaryNav(): JSX.Element {
                 }
               >
                 {item.label}
-                {'accent' in item && item.accent ? (
-                  <span className="ml-0.5 text-brand-red-500" aria-hidden="true">
-                    ◆
-                  </span>
-                ) : null}
               </NavLink>
             </li>
           ))}

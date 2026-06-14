@@ -42,7 +42,10 @@ export default function SubmissionsPage(): JSX.Element {
           </p>
         </div>
         <Link to="/dashboard/author/drafts">
-          <Button variant="ghost" iconLeft={<PencilLine className="h-4 w-4" aria-hidden="true" />}>
+          <Button
+            variant="outline"
+            iconLeft={<PencilLine className="h-4 w-4" aria-hidden="true" />}
+          >
             My drafts
           </Button>
         </Link>

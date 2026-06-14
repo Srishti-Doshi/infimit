@@ -1,4 +1,4 @@
-import { Building2, ShieldCheck, UsersRound } from 'lucide-react';
+import { Building2, Newspaper, ShieldCheck, UsersRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Card, CardBody, Container } from '@/components/ui';
@@ -22,6 +22,12 @@ export default function AdminLandingPage(): JSX.Element {
       description: 'Create new authors and change any user’s role.',
     },
     {
+      to: '/dashboard/admin/articles',
+      icon: <Newspaper className="h-6 w-6" aria-hidden="true" />,
+      title: 'Articles',
+      description: 'Review every published article and publish or unpublish across the site.',
+    },
+    {
       to: '/dashboard/admin/organisations',
       icon: <Building2 className="h-6 w-6" aria-hidden="true" />,
       title: 'Organisations',
@@ -33,7 +39,8 @@ export default function AdminLandingPage(): JSX.Element {
     <Container width="default" className="py-12">
       <h1 className="font-display text-display-md font-semibold text-ink-primary">Admin console</h1>
       <p className="mt-2 text-body-base text-ink-secondary">
-        Identity surfaces for Subphase 2. Articles, comments, ads, and analytics arrive later.
+        Manage editors, authors, and partner organisations. Articles, comments, e-papers, and
+        approvals are in the sidebar.
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">

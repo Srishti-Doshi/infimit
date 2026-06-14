@@ -58,6 +58,16 @@ export default function ApprovalPreviewPage(): JSX.Element {
     queryKey: ['articles', id],
     queryFn: () => getArticle(id),
     enabled: id.length > 0,
+    // The approve handler fires the AI summary pipeline asynchronously (~1–2s),
+    // so the first post-approve fetch lands before the summary is written. Poll
+    // while the article is approved-but-summary-pending so the generated
+    // summary appears on its own — no manual refresh / Regenerate. Polling
+    // stops the moment the summary lands or the pipeline finishes degraded.
+    refetchInterval: (query) => {
+      const a = query.state.data;
+      if (a && a.status === 'approved' && !a.ai?.summary && !a.ai?.degraded) return 2000;
+      return false;
+    },
   });
 
   const invalidateAll = (): Promise<void> =>

@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { Camera, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 
@@ -22,8 +22,8 @@ function initialsOf(name: string): string {
 
 /**
  * Profile page (`/dashboard/me`). Reads the live user from the auth store
- * (boot hydration / login put it there); name is editable, avatar is a stub
- * for Subphase 3, and Logout clears the session.
+ * (boot hydration / login put it there); name is editable, the avatar shows
+ * the user's initials, and Logout clears the session.
  */
 export default function ProfilePage(): JSX.Element {
   const navigate = useNavigate();
@@ -89,14 +89,6 @@ export default function ProfilePage(): JSX.Element {
               {user.role}
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            iconLeft={<Camera className="h-4 w-4" aria-hidden="true" />}
-            onClick={() => toast.info('Avatar upload arrives in Subphase 3.')}
-          >
-            Change avatar
-          </Button>
         </CardBody>
       </Card>
 

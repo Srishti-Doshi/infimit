@@ -256,11 +256,11 @@ function FeaturedCarousel({ articles }: { articles: FeedCard[] }): JSX.Element {
                         slides get h2 so the document outline doesn't see
                         multiple H1s. */}
                     {i === index ? (
-                      <h1 className="font-display text-display-md font-bold leading-tight text-ink-primary transition-colors group-hover:text-brand-red-600">
+                      <h1 className="line-clamp-3 font-display text-display-md font-bold leading-tight text-ink-primary transition-colors group-hover:text-brand-red-600">
                         {slide.title}
                       </h1>
                     ) : (
-                      <h2 className="font-display text-display-md font-bold leading-tight text-ink-primary transition-colors group-hover:text-brand-red-600">
+                      <h2 className="line-clamp-3 font-display text-display-md font-bold leading-tight text-ink-primary transition-colors group-hover:text-brand-red-600">
                         {slide.title}
                       </h2>
                     )}

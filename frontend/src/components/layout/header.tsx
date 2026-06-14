@@ -57,13 +57,13 @@ export function Header(): JSX.Element {
 
           {/* Right cluster */}
           <div className="flex items-center justify-end gap-1 sm:gap-2">
-            <button
-              type="button"
+            <Link
+              to="/search"
               className="hidden h-10 w-10 items-center justify-center rounded-md text-ink-primary transition-colors hover:bg-surface-subtle sm:inline-flex"
               aria-label="Search"
             >
               <Search className="h-5 w-5" aria-hidden="true" />
-            </button>
+            </Link>
             <NotificationBell />
             {user ? (
               <ProfileMenu user={user} />
