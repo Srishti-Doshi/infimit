@@ -29,16 +29,21 @@ import { logger } from '@/config/logger';
 
 import type { SummarizeOptions, SummarizeResult } from './client';
 
-const HTTP_TIMEOUT_MS = 2_000;
 const RETRY_BASE_MS = 200;
 const RETRY_JITTER_MS = 100;
+
+// Per-call timeout is AI_REQUEST_TIMEOUT_MS (env, default 2000) — applied to
+// BOTH the axios client and the opossum breaker (getHttpClient / getBreaker).
+// The env var was already parsed in config/env but the client hardcoded 2s and
+// ignored it; this wires it through. 2s suited the originally-planned local
+// BART model; the merged AI service calls a remote Groq LLM (~1-2s/call), so
+// AI_REQUEST_TIMEOUT_MS should be raised (e.g. 10000) wherever it runs.
 
 // Circuit-breaker tuning per docs/06-ai-service.md §6.4:
 //   - 5 consecutive failures within the rolling window → open.
 //   - Once open, stays open for 30s before allowing a half-open probe.
 //   - errorThresholdPercentage=50 + volumeThreshold=5 means we need at least
-//     5 calls AND ≥50% failure rate to open. Tunable later via env if needed.
-const CIRCUIT_TIMEOUT_MS = 2_000;
+//     5 calls AND ≥50% failure rate to open.
 const CIRCUIT_VOLUME_THRESHOLD = 5;
 const CIRCUIT_ERROR_PERCENTAGE = 50;
 const CIRCUIT_ROLLING_WINDOW_MS = 30_000;
@@ -59,7 +64,7 @@ function getHttpClient(): AxiosInstance {
   const env = loadEnv();
   httpClient = axios.create({
     baseURL: env.AI_SERVICE_URL,
-    timeout: HTTP_TIMEOUT_MS,
+    timeout: env.AI_REQUEST_TIMEOUT_MS,
     headers: {
       'Content-Type': 'application/json',
       'X-Internal-Key': env.AI_INTERNAL_KEY,
@@ -145,9 +150,10 @@ let breaker: SummarizeBreaker | null = null;
 
 function getBreaker(): SummarizeBreaker {
   if (breaker) return breaker;
+  const env = loadEnv();
   breaker = new CircuitBreaker<[SummarizePayload], SummarizeResult>(callSummarizeWithRetry, {
     name: 'ai-summarize',
-    timeout: CIRCUIT_TIMEOUT_MS,
+    timeout: env.AI_REQUEST_TIMEOUT_MS,
     volumeThreshold: CIRCUIT_VOLUME_THRESHOLD,
     errorThresholdPercentage: CIRCUIT_ERROR_PERCENTAGE,
     rollingCountTimeout: CIRCUIT_ROLLING_WINDOW_MS,
