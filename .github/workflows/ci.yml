@@ -1,13 +1,14 @@
 # ---------------------------------------------------------------
-# Infimit CI — backend + frontend
+# Infimit CI — backend + frontend + ai-service
 #
-# Two parallel jobs share the same workflow:
-#   - `backend`  → typecheck / lint / format / test / build
-#   - `frontend` → typecheck / lint / format / test / build
+# Three parallel jobs share the same workflow:
+#   - `backend`    → typecheck / lint / format / test / build
+#   - `frontend`   → typecheck / lint / format / test / build
+#   - `ai-service` → pytest (FastAPI unit tests; the Groq call is mocked)
 #
-# Both jobs run on every PR and every push to main. Each uses its own
-# lockfile-keyed npm cache. Concurrency cancellation prevents wasted
-# minutes on rapid-fire pushes.
+# All run on every PR and every push to main. The Node jobs use a
+# lockfile-keyed npm cache; the ai-service job caches pip. Concurrency
+# cancellation prevents wasted minutes on rapid-fire pushes.
 # ---------------------------------------------------------------
 
 name: CI
@@ -134,3 +135,48 @@ jobs:
           test -f dist/index.html
           test -d dist/assets
           echo "OK — dist/index.html and dist/assets present."
+
+  # ─── AI service ──────────────────────────────────────────────────────
+  ai-service:
+    name: AI service checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: ai-service
+
+    # These vars only need to be PRESENT so `app.config.Settings()` constructs
+    # at import (every test imports the FastAPI app). The unit tests mock the
+    # Groq call, so GROQ_API_KEY is a dummy and is never used. AI_INTERNAL_KEY
+    # must equal the tests' VALID_KEY ("test_key").
+    env:
+      AI_INTERNAL_KEY: test_key
+      PORT: '8000'
+      LOG_LEVEL: info
+      MODELS_CACHE_DIR: ./models_cache
+      ENABLE_METRICS: 'true'
+      GROQ_API_KEY: dummy-key-not-used-in-ci
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: ai-service/requirements.txt
+
+      - name: Install dependencies
+        # pytest is a dev-only dep, so it isn't in the runtime requirements.txt.
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Test
+        # `tests/test_api.py::test_summarize_success` is deselected: it makes a
+        # REAL Groq API call (unmocked), which CI can't run without a live key.
+        # The mocked `test_summarize_stub_success` covers the same contract.
+        run: pytest -q --deselect tests/test_api.py::test_summarize_success
