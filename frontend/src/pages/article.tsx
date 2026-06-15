@@ -273,21 +273,25 @@ export default function ArticlePage(): JSX.Element {
             </div>
           </Card>
         ) : (
-          /* Logged-out readers get a compact single-row locked teaser — title +
-             prompt on the left, sign-in CTAs on the right; wraps on mobile. */
+          /* Logged-out readers get a locked teaser. Stacks on mobile (icon +
+             text on top, CTAs full-width below) and becomes a single row on
+             sm+ — otherwise the buttons starve the title on narrow phones,
+             wrapping it into "AI / summary" and the prompt word-by-word. */
           <Card className="mt-8 overflow-hidden border-brand-red-100 bg-gradient-to-br from-brand-red-50 to-brand-red-50/30">
-            <div className="flex flex-wrap items-center gap-3 px-5 py-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-red-100 text-brand-red-600">
-                <Sparkles className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-display text-body-lg font-semibold leading-tight text-ink-primary">
-                  AI summary
+            <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-red-100 text-brand-red-600">
+                  <Sparkles className="h-5 w-5" aria-hidden="true" />
                 </span>
-                <span className="block text-body-xs text-ink-tertiary">
-                  Sign in to read the key points, summarized in seconds.
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-body-lg font-semibold leading-tight text-ink-primary">
+                    AI summary
+                  </span>
+                  <span className="block text-body-xs text-ink-tertiary">
+                    Sign in to read the key points, summarized in seconds.
+                  </span>
                 </span>
-              </span>
+              </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Link to="/auth/login">
                   <Button variant="primary" size="sm">

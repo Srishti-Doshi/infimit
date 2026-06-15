@@ -43,7 +43,7 @@ export default function AdminApprovalsPage(): JSX.Element {
       </header>
 
       <Card className="mt-8">
-        <CardBody className="p-0">
+        <CardBody className="overflow-x-auto p-0">
           {isLoading ? (
             <SkeletonRows columns={5} rows={4} />
           ) : items.length === 0 ? (

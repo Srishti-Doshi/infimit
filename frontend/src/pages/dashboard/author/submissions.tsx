@@ -52,7 +52,7 @@ export default function SubmissionsPage(): JSX.Element {
       </div>
 
       <Card className="mt-8">
-        <CardBody className="p-0">
+        <CardBody className="overflow-x-auto p-0">
           {isLoading ? (
             <SkeletonRows columns={4} rows={3} />
           ) : items.length === 0 ? (

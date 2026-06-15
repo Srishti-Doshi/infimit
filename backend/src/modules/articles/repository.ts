@@ -362,6 +362,21 @@ export async function findTrendingFallback(limit: number): Promise<ArticleModel[
 }
 
 /**
+ * Editorially-pinned trending articles — `placement.trending = true`. These
+ * lead the Trending rail ahead of the automatic engagement-scored set, letting
+ * an editor surface a story before its view/save score catches up. Ordered by
+ * `placement.priority` desc (the same editorial knob as Featured) then
+ * `publishedAt` desc. The `placement_trending_score` index serves the equality
+ * match on `placement.trending`.
+ */
+export async function findPinnedTrending(limit: number): Promise<ArticleModel[]> {
+  return Article.find({ status: 'published', deletedAt: null, 'placement.trending': true })
+    .sort({ 'placement.priority': -1, publishedAt: -1 })
+    .limit(limit)
+    .exec();
+}
+
+/**
  * Hydrate a list of article IDs into published `ArticleModel` docs, preserving
  * the input order. Filters out IDs that don't resolve to a published, non-
  * soft-deleted article (e.g. a previously-trending article that's since been
@@ -406,6 +421,21 @@ export async function adjustBookmarkCount(
   delta: number,
 ): Promise<void> {
   await Article.updateOne({ _id: id }, { $inc: { 'stats.bookmarks': delta } }).exec();
+}
+
+/**
+ * Atomic adjustment of the denormalised `stats.commentsCount` counter — the
+ * number of APPROVED (publicly visible) comments on an article. Maintained by
+ * the comments module: +1 when a comment transitions INTO `approved`, -1 when
+ * an approved comment transitions out (rejected/hidden) or an approved comment
+ * is deleted. Best-effort, same contract as `adjustBookmarkCount`; the
+ * schema's `min: 0` defends the final stored value.
+ */
+export async function adjustCommentCount(
+  id: Types.ObjectId | string,
+  delta: number,
+): Promise<void> {
+  await Article.updateOne({ _id: id }, { $inc: { 'stats.commentsCount': delta } }).exec();
 }
 
 /**

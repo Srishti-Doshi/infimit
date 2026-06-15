@@ -11,7 +11,7 @@
  * search module hydrates the doc); `<FeedCardRow>` normalises it down to
  * the visible fields.
  */
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 
@@ -25,6 +25,13 @@ export default function SearchPage(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const q = (params.get('q') ?? '').trim();
   const [input, setInput] = useState(q);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus on mount so arriving from the header search icon lands the
+  // cursor in the field — no second click needed (UX gap fix).
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const { data, isPending, isError, refetch } = useQuery<SearchResult>({
     queryKey: ['search', q],
@@ -64,6 +71,7 @@ export default function SearchPage(): JSX.Element {
             Search articles
           </label>
           <input
+            ref={inputRef}
             id="search-input"
             type="search"
             value={input}

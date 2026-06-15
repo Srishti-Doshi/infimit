@@ -3,7 +3,8 @@
  *   - GET /v1/articles/feed/home composite payload (trail / featured /
  *     latest / trending) with trail-empty + featured-missing fallbacks
  *   - GET /v1/articles/feed/trending: cold-cache fallback (sorts by
- *     stats.trendingScore) AND hot-cache hydration in the order set by Redis
+ *     stats.trendingScore), hot-cache hydration in the order set by Redis,
+ *     AND editorial `placement.trending` pins leading the rail (priority desc)
  *   - GET /v1/articles dual-mode behaviour:
  *       - unauthed + filters → public list
  *       - authed + filters    → public list (filter trumps auth — A1)
@@ -314,6 +315,56 @@ describe('GET /v1/articles/feed/trending', () => {
     const res = await request(app).get('/v1/articles/feed/trending');
     expect(res.status).toBe(200);
     expect(res.body.data.items.map((c: { slug: string }) => c.slug)).toEqual(['x']);
+  });
+
+  it('pins placement.trending articles ahead of the engagement-scored set', async () => {
+    const a = await seedUser('author');
+    // Organically hot, but NOT pinned.
+    await seedArticle({
+      title: 'organic-hot',
+      slug: 'organic-hot',
+      stats: { trendingScore: 100 },
+      authorId: a.id,
+    });
+    // Editor-pinned with zero engagement score — must still lead the rail.
+    await seedArticle({
+      title: 'editor-pinned',
+      slug: 'editor-pinned',
+      placement: { trending: true, priority: 10 },
+      stats: { trendingScore: 0 },
+      authorId: a.id,
+    });
+
+    const res = await request(app).get('/v1/articles/feed/trending');
+    expect(res.status).toBe(200);
+    const slugs = res.body.data.items.map((c: { slug: string }) => c.slug);
+    // Pin leads despite a lower score; the organically-hot one follows.
+    expect(slugs).toEqual(['editor-pinned', 'organic-hot']);
+  });
+
+  it('orders multiple pins by priority desc and de-dups against the Redis snapshot', async () => {
+    const a = await seedUser('author');
+    // Pinned AND in the cron snapshot — must appear once, in its pinned slot.
+    const idPinLow = await seedArticle({
+      title: 'pin-low',
+      slug: 'pin-low',
+      placement: { trending: true, priority: 10 },
+      authorId: a.id,
+    });
+    await seedArticle({
+      title: 'pin-high',
+      slug: 'pin-high',
+      placement: { trending: true, priority: 90 },
+      authorId: a.id,
+    });
+    // Hot snapshot ranks pin-low; the merge must not duplicate it.
+    await getRedis().set('feed:trending', JSON.stringify([idPinLow]));
+
+    const res = await request(app).get('/v1/articles/feed/trending');
+    expect(res.status).toBe(200);
+    const slugs = res.body.data.items.map((c: { slug: string }) => c.slug);
+    // priority desc among pins → pin-high first; pin-low appears exactly once.
+    expect(slugs).toEqual(['pin-high', 'pin-low']);
   });
 });
 

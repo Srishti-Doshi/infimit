@@ -82,6 +82,7 @@ describe('useRoleNav', () => {
       // belongs here too (pins #99).
       'Pending comments',
       'Articles',
+      'Articles analytics',
       'Authors',
       'Editors',
       'Organisations',
@@ -102,6 +103,7 @@ describe('useRoleNav', () => {
       'Admin console': '/dashboard/admin',
       'Approvals queue': '/dashboard/admin/approvals',
       Articles: '/dashboard/admin/articles',
+      'Articles analytics': '/dashboard/admin/analytics',
       Authors: '/dashboard/admin/authors',
       Editors: '/dashboard/admin/editors',
       Organisations: '/dashboard/admin/organisations',

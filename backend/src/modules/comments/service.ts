@@ -278,6 +278,16 @@ export async function moderateComment(input: ModerateCommentInput): Promise<Comm
     'comment_moderated',
   );
 
+  // Maintain the denormalised approved-comment count: +1 when a comment enters
+  // `approved`, -1 when an approved comment leaves it (rejected/hidden). Other
+  // transitions (e.g. pending → rejected) don't change the visible count.
+  let commentDelta = 0;
+  if (input.status === 'approved' && !wasAlreadyApproved) commentDelta = 1;
+  else if (input.status !== 'approved' && wasAlreadyApproved) commentDelta = -1;
+  if (commentDelta !== 0) {
+    await articlesRepo.adjustCommentCount(updated.articleId, commentDelta);
+  }
+
   // Emit `comment.approved` only when this transition crossed into approved
   // from a non-approved prior state. Re-approving an already-approved comment
   // is idempotent and must not refire the event.
@@ -348,6 +358,12 @@ export async function deleteComment(input: DeleteCommentInput): Promise<void> {
     },
     'comment_deleted',
   );
+
+  // Keep the denormalised approved-comment count in sync — only an APPROVED
+  // comment was contributing to it.
+  if (existing.status === 'approved') {
+    await articlesRepo.adjustCommentCount(existing.articleId, -1);
+  }
 }
 
 // Re-export the document type so callers (controller) can reference it

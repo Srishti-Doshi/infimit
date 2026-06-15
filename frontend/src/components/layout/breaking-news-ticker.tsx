@@ -43,7 +43,12 @@ export function BreakingNewsTicker(): JSX.Element | null {
       <span className="flex shrink-0 items-center bg-brand-red-700 px-3 py-1.5 text-body-xs font-bold uppercase tracking-wider">
         Top News
       </span>
-      <div className="flex-1 overflow-hidden">
+      {/* min-w-0 is load-bearing: without it the flex item's default
+          `min-width: auto` lets this wrapper grow to the marquee's full
+          (multi-thousand-px) width instead of clipping it — which pushes the
+          whole page wider than the viewport and causes horizontal scroll /
+          broken layout on mobile. */}
+      <div className="min-w-0 flex-1 overflow-hidden">
         <ul className="inline-flex w-max animate-ticker items-center gap-8 whitespace-nowrap py-1.5 pl-8 pr-0 text-body-xs">
           {items.map((article, i) => (
             <li key={`${article.id}-${i}`} className="inline-flex items-center gap-8">

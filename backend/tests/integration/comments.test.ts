@@ -335,3 +335,88 @@ describe('DELETE /v1/comments/:id', () => {
     expect(res.status).toBe(204);
   });
 });
+
+// ─── stats.commentsCount denormalisation ────────────────────────────────
+
+describe('stats.commentsCount denormalisation (approved-comment count)', () => {
+  async function setup(): Promise<{
+    articleId: string;
+    commentId: string;
+    editorToken: string;
+    readerToken: string;
+  }> {
+    const author = await seedUser('author');
+    const reader = await seedUser('reader');
+    const editor = await seedUser('editor');
+    const articleId = await seedPublishedArticle(author.id);
+    const posted = await request(app)
+      .post(`/v1/articles/${articleId}/comments`)
+      .set('Authorization', `Bearer ${reader.token}`)
+      .send({ body: 'count me' });
+    return {
+      articleId,
+      commentId: posted.body.data.comment.id,
+      editorToken: editor.token,
+      readerToken: reader.token,
+    };
+  }
+
+  async function commentsCount(articleId: string): Promise<number> {
+    const article = await Article.findById(articleId);
+    return article?.stats?.commentsCount ?? -1;
+  }
+
+  it('stays 0 while the comment is pending', async () => {
+    const { articleId } = await setup();
+    expect(await commentsCount(articleId)).toBe(0);
+  });
+
+  it('increments to 1 when a comment is approved', async () => {
+    const { articleId, commentId, editorToken } = await setup();
+    await request(app)
+      .post(`/v1/comments/${commentId}/approve`)
+      .set('Authorization', `Bearer ${editorToken}`);
+    expect(await commentsCount(articleId)).toBe(1);
+  });
+
+  it('does not double-count when an already-approved comment is re-approved', async () => {
+    const { articleId, commentId, editorToken } = await setup();
+    await request(app)
+      .post(`/v1/comments/${commentId}/approve`)
+      .set('Authorization', `Bearer ${editorToken}`);
+    await request(app)
+      .post(`/v1/comments/${commentId}/approve`)
+      .set('Authorization', `Bearer ${editorToken}`);
+    expect(await commentsCount(articleId)).toBe(1);
+  });
+
+  it('decrements back to 0 when an approved comment is hidden', async () => {
+    const { articleId, commentId, editorToken } = await setup();
+    await request(app)
+      .post(`/v1/comments/${commentId}/approve`)
+      .set('Authorization', `Bearer ${editorToken}`);
+    await request(app)
+      .post(`/v1/comments/${commentId}/hide`)
+      .set('Authorization', `Bearer ${editorToken}`);
+    expect(await commentsCount(articleId)).toBe(0);
+  });
+
+  it('decrements when an approved comment is deleted', async () => {
+    const { articleId, commentId, editorToken } = await setup();
+    await request(app)
+      .post(`/v1/comments/${commentId}/approve`)
+      .set('Authorization', `Bearer ${editorToken}`);
+    await request(app)
+      .delete(`/v1/comments/${commentId}`)
+      .set('Authorization', `Bearer ${editorToken}`);
+    expect(await commentsCount(articleId)).toBe(0);
+  });
+
+  it('does not change when a pending comment is deleted (never counted)', async () => {
+    const { articleId, commentId, readerToken } = await setup();
+    await request(app)
+      .delete(`/v1/comments/${commentId}`)
+      .set('Authorization', `Bearer ${readerToken}`);
+    expect(await commentsCount(articleId)).toBe(0);
+  });
+});

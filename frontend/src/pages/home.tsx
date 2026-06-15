@@ -142,7 +142,7 @@ function FeaturedHero({ articles, topStories }: FeaturedHeroProps): JSX.Element 
       <h2 id="featured-heading" className="sr-only">
         Featured stories
       </h2>
-      <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
+      <div className="grid gap-8 lg:grid-cols-[1fr_280px]">
         <FeaturedCarousel articles={articles} />
         <aside aria-label="Top stories" className="lg:border-l lg:border-line lg:pl-8">
           <h3 className="border-b-2 border-brand-red-500 pb-2 font-display text-body-base font-bold uppercase tracking-wide text-ink-primary">
@@ -212,7 +212,7 @@ function FeaturedCarousel({ articles }: { articles: FeedCard[] }): JSX.Element {
   return (
     <div
       ref={containerRef}
-      className="relative"
+      className="relative min-w-0"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
@@ -500,7 +500,7 @@ function CoverArea({
 function HomeSkeleton(): JSX.Element {
   return (
     <div className="space-y-10">
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
         <div className="space-y-4">
           <Skeleton className="aspect-[3/2] w-full rounded-lg" />
           <Skeleton className="h-3 w-24" />
