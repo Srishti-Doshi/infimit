@@ -20,6 +20,9 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# print("DEBUG GROQ KEY:", settings.GROQ_API_KEY)
-print("Environment loaded successfully")
-print("Metrics enabled:", settings.ENABLE_METRICS)
+import logging
+
+logger = logging.getLogger(__name__)
+
+logger.info("Environment loaded successfully")
+logger.info("Metrics enabled: %s", settings.ENABLE_METRICS)
