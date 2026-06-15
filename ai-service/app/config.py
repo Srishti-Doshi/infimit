@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     MODELS_CACHE_DIR: str
     ENABLE_METRICS: bool
     GROQ_API_KEY: str 
+    EXPOSE_DOCS: bool = True
+    LRU_CAPACITY: int = 100
 
     model_config = SettingsConfigDict(
         env_file=".env",
