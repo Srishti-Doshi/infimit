@@ -5,7 +5,9 @@ from app.config import settings
 def verify_internal_key(
     x_internal_key: str = Header(...)
 ):
-    print("verify_internal_key called")
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("verify_internal_key called")
     if x_internal_key != settings.AI_INTERNAL_KEY:
         raise HTTPException(
             status_code=401,
