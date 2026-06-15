@@ -57,7 +57,7 @@ export default function AdminEditorsPage(): JSX.Element {
       </div>
 
       <Card className="mt-6">
-        <CardBody className="p-0">
+        <CardBody className="overflow-x-auto p-0">
           {isLoading ? (
             <SkeletonRows columns={4} rows={3} />
           ) : !data || data.items.length === 0 ? (

@@ -13,7 +13,7 @@ import {
   Twitter,
   X,
 } from 'lucide-react';
-import { type ComponentType, type SVGProps } from 'react';
+import { useState, type ComponentType, type FormEvent, type SVGProps } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 
 import { Button, Input, toast } from '@/components/ui';
@@ -76,6 +76,17 @@ export function Sidebar(): JSX.Element {
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
   const user = useAuthStore((s) => s.user);
   const { isAuthed, roleLabel, items: roleItems } = useRoleNav();
+  const [searchValue, setSearchValue] = useState('');
+
+  // Drawer search submits to the search page (the only search entry-point a
+  // phone user has, since the header search icon is desktop-only). Empty query
+  // still navigates to /search so the user lands on the full search surface.
+  function handleSearchSubmit(e: FormEvent<HTMLFormElement>): void {
+    e.preventDefault();
+    const query = searchValue.trim();
+    setSidebarOpen(false);
+    navigate(query.length > 0 ? `/search?q=${encodeURIComponent(query)}` : '/search');
+  }
 
   const logoutMutation = useMutation({
     mutationFn: logout,
@@ -115,11 +126,17 @@ export function Sidebar(): JSX.Element {
 
           <div className="flex-1 overflow-y-auto">
             <div className="border-b border-line p-4">
-              <Input
-                aria-label="Search news"
-                placeholder="Search news, topics, and more…"
-                iconLeft={<Search className="h-4 w-4" />}
-              />
+              <form onSubmit={handleSearchSubmit} role="search">
+                <Input
+                  type="search"
+                  enterKeyHint="search"
+                  aria-label="Search news"
+                  placeholder="Search news, topics, and more…"
+                  iconLeft={<Search className="h-4 w-4" />}
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(e.target.value)}
+                />
+              </form>
             </div>
 
             {isAuthed && user ? (

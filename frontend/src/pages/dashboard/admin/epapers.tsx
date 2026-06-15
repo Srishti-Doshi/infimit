@@ -72,7 +72,7 @@ export default function AdminEpapersPage(): JSX.Element {
       </header>
 
       <Card className="mt-8">
-        <CardBody className="p-0">
+        <CardBody className="overflow-x-auto p-0">
           {isLoading ? (
             <SkeletonRows columns={5} rows={3} />
           ) : items.length === 0 ? (

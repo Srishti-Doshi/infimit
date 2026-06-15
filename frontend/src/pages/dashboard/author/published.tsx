@@ -55,7 +55,7 @@ export default function PublishedPage(): JSX.Element {
       </div>
 
       <Card className="mt-8">
-        <CardBody className="p-0">
+        <CardBody className="overflow-x-auto p-0">
           {isLoading ? (
             <SkeletonRows columns={6} rows={3} />
           ) : items.length === 0 ? (

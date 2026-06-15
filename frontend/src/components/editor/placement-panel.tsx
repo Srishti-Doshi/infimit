@@ -134,7 +134,8 @@ function PlacementPanelInner({ article }: PlacementPanelProps): JSX.Element {
               Editorial placement
             </h2>
             <p className="mt-0.5 text-body-sm text-ink-secondary">
-              Featured / trending / trail flags + priority. <PlacementSummary placement={local} />
+              Featured / Trending / Top Stories flags + priority.{' '}
+              <PlacementSummary placement={local} />
             </p>
           </div>
           {open ? (
@@ -164,8 +165,8 @@ function PlacementPanelInner({ article }: PlacementPanelProps): JSX.Element {
               />
               <Toggle
                 id="placement-trail"
-                label="Trail"
-                description="Show in section trail strips below the hero."
+                label="Top Stories"
+                description="Show in the Top Stories list beside the home hero."
                 checked={local.trail}
                 onChange={(v) => update('trail', v)}
               />
@@ -263,7 +264,7 @@ function PlacementSummary({ placement }: { placement: ArticlePlacement }): JSX.E
   const active: string[] = [];
   if (placement.featured) active.push('Featured');
   if (placement.trending) active.push('Trending');
-  if (placement.trail) active.push('Trail');
+  if (placement.trail) active.push('Top Stories');
   if (active.length === 0) return <span>No surfaces active.</span>;
   return (
     <span>

@@ -161,7 +161,7 @@ export default function PendingCommentsPage(): JSX.Element {
       ) : null}
 
       <Card className="mt-8">
-        <CardBody className="p-0">
+        <CardBody className="overflow-x-auto p-0">
           {isLoading ? (
             <SkeletonRows columns={6} rows={4} />
           ) : items.length === 0 ? (

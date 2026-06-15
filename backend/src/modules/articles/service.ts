@@ -1239,30 +1239,51 @@ export async function getHomeFeed(): Promise<HomeFeedPayload> {
  * would double-cache and complicate eviction when the cron writes a new
  * snapshot. Hydration on every request is fine for P1 (one indexed `$in`
  * query at most).
+ *
+ * Editorially-pinned articles (`placement.trending = true`) lead the rail,
+ * ahead of the automatic engagement-scored set — an editor override for
+ * stories that matter before clicks accumulate. They're queried fresh on every
+ * request (not via the cron snapshot), so toggling the flag reflects as soon as
+ * the home-feed cache recomputes (placement edits bust it immediately).
  */
 export async function getTrendingFeed(): Promise<FeedCardView[]> {
   const redis = getRedis();
-  let articles: ArticleModel[] = [];
 
+  // Editorial pins first — independent of the cron snapshot below.
+  const pinned = await articlesRepo.findPinnedTrending(TRENDING_LIMIT);
+
+  let scored: ArticleModel[] = [];
   try {
     const raw = await redis.get(cache.cacheKeys.feedTrending());
     if (raw) {
       const parsed = JSON.parse(raw) as unknown;
       if (Array.isArray(parsed) && parsed.every((v): v is string => typeof v === 'string')) {
-        articles = await articlesRepo.findByIdsPreservingOrder(parsed.slice(0, TRENDING_LIMIT));
+        scored = await articlesRepo.findByIdsPreservingOrder(parsed.slice(0, TRENDING_LIMIT));
       }
     }
   } catch (err) {
     logger.warn({ err }, 'trending_cache_read_failed');
   }
 
-  if (articles.length === 0) {
+  if (scored.length === 0) {
     // Cold-cache fallback per docs/13-feature-documentation.md A3.
     logger.warn('feed_trending_cold_fallback');
-    articles = await articlesRepo.findTrendingFallback(TRENDING_LIMIT);
+    scored = await articlesRepo.findTrendingFallback(TRENDING_LIMIT);
   }
 
-  return shapeFeedCards(articles);
+  // Pinned ahead of engagement-ranked; dedup so an article that is both pinned
+  // AND organically trending keeps its (leading) pinned slot. Capped to the
+  // rail limit so a wall of pins can't unbound the payload.
+  const seen = new Set<string>();
+  const merged: ArticleModel[] = [];
+  for (const article of [...pinned, ...scored]) {
+    const id = article._id.toString();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    merged.push(article);
+  }
+
+  return shapeFeedCards(merged.slice(0, TRENDING_LIMIT));
 }
 
 export interface PublicListInput {

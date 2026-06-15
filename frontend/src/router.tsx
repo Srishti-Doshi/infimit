@@ -43,6 +43,7 @@ const ApprovalPreviewPage = lazy(() => import('@/pages/dashboard/editor/approval
 const PendingCommentsPage = lazy(() => import('@/pages/dashboard/editor/comments/pending'));
 const AdminLandingPage = lazy(() => import('@/pages/dashboard/admin'));
 const AdminArticlesPage = lazy(() => import('@/pages/dashboard/admin/articles'));
+const AdminAnalyticsPage = lazy(() => import('@/pages/dashboard/admin/analytics'));
 const AdminAuthorsPage = lazy(() => import('@/pages/dashboard/admin/authors'));
 const AdminEditorsPage = lazy(() => import('@/pages/dashboard/admin/editors'));
 const AdminOrganisationsPage = lazy(() => import('@/pages/dashboard/admin/organisations'));
@@ -158,6 +159,7 @@ const router = createBrowserRouter(
                   children: [
                     { path: 'dashboard/admin', element: <AdminLandingPage /> },
                     { path: 'dashboard/admin/articles', element: <AdminArticlesPage /> },
+                    { path: 'dashboard/admin/analytics', element: <AdminAnalyticsPage /> },
                     { path: 'dashboard/admin/authors', element: <AdminAuthorsPage /> },
                     { path: 'dashboard/admin/editors', element: <AdminEditorsPage /> },
                     { path: 'dashboard/admin/organisations', element: <AdminOrganisationsPage /> },

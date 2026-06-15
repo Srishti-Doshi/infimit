@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   Bell,
   Bookmark,
   Building2,
@@ -94,6 +95,7 @@ const ADMIN_NAV: NavItem[] = [
   // the order it has in EDITOR_NAV. Pins #99.
   { label: 'Pending comments', href: '/dashboard/editor/comments/pending', icon: MessageSquare },
   { label: 'Articles', href: '/dashboard/admin/articles', icon: FileText },
+  { label: 'Articles analytics', href: '/dashboard/admin/analytics', icon: BarChart3 },
   { label: 'Authors', href: '/dashboard/admin/authors', icon: ShieldCheck },
   { label: 'Editors', href: '/dashboard/admin/editors', icon: Users },
   { label: 'Organisations', href: '/dashboard/admin/organisations', icon: Building2 },
