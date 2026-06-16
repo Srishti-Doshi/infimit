@@ -3,7 +3,7 @@
 
 # Stray dependency artifacts at the repo root — should NEVER exist since no root package.json
 /node_modules
-/package-lock.json
+/package-k.json
 /package.json
 /yarn.lock
 /pnpm-lock.yaml
