@@ -84,9 +84,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-@app.get("/sentry-test")
-def sentry_test():
-    raise Exception("Sentry test error")
+ 
 
 app.add_middleware(AuthMiddleware) 
 
