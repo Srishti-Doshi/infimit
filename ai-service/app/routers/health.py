@@ -3,6 +3,8 @@ import time
 import platform
 
 from app.models.loader import get_groq_client
+from fastapi import HTTPException
+from app.config import settings
 
 router = APIRouter()
 
@@ -21,15 +23,19 @@ def healthz():
 def readyz():
     try:
         get_groq_client()
-
         return {
             "ready": True,
             "models": {
                 "summarize": "loaded"
             }
         }
-
     except Exception as e:
+        if settings.READY_REQUIRES_MODEL:
+            raise HTTPException(
+                status_code=503,
+                detail="Groq unavailable"
+            )
+
         return {
             "ready": False,
             "models": {

@@ -1,23 +1,39 @@
 from app.models.loader import get_groq_client
 from app.utils.cache import get_cache, set_cache
+from app.config import settings
 import logging
 import hashlib
 
 logger = logging.getLogger(__name__)
 
 
+
+
+
 def summarize_text(text: str, max_words: int = 120, style: str = "default"):
+    
+    if settings.FORCE_FALLBACK:
+       return {
+        "summary": text[:200],
+        "degraded": True,
+        "model": "fallback-truncate"
+    }
+    
+    
     try:
         # -------------------------
         # 1. CACHE KEY
         # -------------------------
         cache_key = "summarize:" + hashlib.md5(text.encode()).hexdigest()
 
+
         cached_result = get_cache(cache_key)
 
-        # Always return cached value if valid
         if isinstance(cached_result, str) and cached_result.strip():
-            return cached_result
+          return {
+                 "summary": cached_result,
+                 "cached": True
+         }
 
         # -------------------------
         # 2. LOAD MODEL CLIENT
@@ -29,6 +45,15 @@ def summarize_text(text: str, max_words: int = 120, style: str = "default"):
         # -------------------------
         # 3. SYSTEM PROMPTS (UPDATED)
         # -------------------------
+
+
+        style_instruction = {
+    "neutral": "Use neutral news-reporting language.",
+    "engaging": "Use engaging and reader-friendly language.",
+    "academic": "Use formal academic language."
+       }.get(style, "Use neutral news-reporting language.")
+
+
 
         # SHORT ARTICLE
         if word_count < 300:
@@ -100,12 +125,15 @@ FORMAT:
 • Important point 3
 """
 
+        system_prompt += f"\n{style_instruction}"
+        system_prompt += f"\nKeep the summary under {max_words} words."
         # -------------------------
         # 4. MODEL CALL
         # -------------------------
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             temperature=0.2,
+            max_tokens=max_words * 2,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text}
@@ -119,7 +147,10 @@ FORMAT:
         # -------------------------
         set_cache(cache_key, result, ttl=3600)
 
-        return result
+        return {
+    "summary": result,
+    "cached": False
+}
 
     except Exception as e:
         logger.exception("Summarization failed: %s", str(e))

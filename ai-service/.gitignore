@@ -1,7 +1,6 @@
 # Environment files
 .env
-.env.example
-
+ 
 # Python cache
 **/__pycache__/
 *.py[cod]
