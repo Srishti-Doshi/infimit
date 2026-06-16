@@ -1,18 +1,19 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from dotenv import dotenv_values
-from dotenv import load_dotenv
 
-load_dotenv()
 
 class Settings(BaseSettings):
-    AI_INTERNAL_KEY: str
-    PORT: int
-    LOG_LEVEL: str
-    MODELS_CACHE_DIR: str
-    ENABLE_METRICS: bool
-    GROQ_API_KEY: str 
+    sentry_dsn: str | None = None
+    env: str = "development"
+    WARM_ON_STARTUP: bool = False
+    AI_INTERNAL_KEY: str = "test"
+    PORT: int = 8000
+    LOG_LEVEL: str = "INFO"
+    MODELS_CACHE_DIR: str = "./models"
+    ENABLE_METRICS: bool = True
+    GROQ_API_KEY: str = "test"
     EXPOSE_DOCS: bool = True
     LRU_CAPACITY: int = 100
+    FORCE_FALLBACK: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -21,10 +22,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-import logging
-
-logger = logging.getLogger(__name__)
-
-logger.info("Environment loaded successfully")
-logger.info("Metrics enabled: %s", settings.ENABLE_METRICS)

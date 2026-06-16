@@ -1,4 +1,8 @@
 import time
+from app.services.summarize_service import summarize_text
+from app.services.logger import log_request
+from app.dependencies import verify_internal_key
+from app.dependencies import GroqClient, InternalAuth
 
 from fastapi import (
     APIRouter,
@@ -8,21 +12,19 @@ from fastapi import (
     Response
 )
 
-from app.dependencies import verify_internal_key
+
 from app.schemas.summarize import (
     SummarizeRequest,
     SummarizeResponse
 )
-from app.services.summarize_service import summarize_text
-from app.services.logger import log_request
+
 
 from app.services.metrics_service import (
     REQUESTS,
     REQUEST_DURATION
 )
 
-from app.middleware.rate_limiter import is_rate_limited
-
+ 
 router = APIRouter()
 
 @router.post(
@@ -36,13 +38,9 @@ def summarize(
     _: bool = Depends(verify_internal_key)
 ):
 
-    client_ip = request.client.host
+     
 
-    if is_rate_limited(client_ip):
-        raise HTTPException(
-            status_code=429,
-            detail="Too many requests. Please try again later."
-        )
+     
 
     start_time = time.time()
 
@@ -56,11 +54,13 @@ def summarize(
         degraded = False
         model_name = "llama-3.3-70b-versatile"
         summary_text = result
+        cached = False
 
         if isinstance(result, dict):
             degraded = result.get("degraded", False)
             model_name = result.get("model", model_name)
             summary_text = result["summary"]
+            cached = result.get("cached", False)
 
         response.headers["X-Degraded"] = str(degraded).lower()
 
@@ -86,7 +86,7 @@ def summarize(
             "model": model_name,
             "tokensIn": len(data.text.split()),
             "tokensOut": len(summary_text.split()),
-            "cached": False
+            "cached": cached
         }
 
     except Exception as e:
