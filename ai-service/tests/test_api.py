@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -64,7 +65,8 @@ def test_summarize_empty_text():
 # -------------------------
 # 6. Valid summarization test
 # -------------------------
-def test_summarize_success():
+@patch("app.routers.summarize.summarize_text", return_value="India launched a satellite mission to improve communication.")
+def test_summarize_success(_mock_summarize):
     response = client.post(
         "/v1/summarize",
         headers={"X-Internal-Key": VALID_KEY},
