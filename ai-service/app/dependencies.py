@@ -32,9 +32,9 @@ def get_groq_client():
 
         # Metrics (safe, non-blocking)
         try:
-            MODEL_LOADED.labels(model="llama-3.3-70b-versatile").set(1)
+            MODEL_LOADED.labels(model=settings.GROQ_MODEL).set(1)
             MODEL_LOAD_DURATION.labels(
-                model="llama-3.3-70b-versatile"
+                model=settings.GROQ_MODEL
             ).observe(time.time() - start_time)
         except Exception:
             pass
