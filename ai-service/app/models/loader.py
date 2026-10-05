@@ -1,7 +1,7 @@
 from groq import Groq
 import time
 
-from app.config import Settings
+from app.config import Settings, settings
 from app.services.metrics_service import MODEL_LOADED, MODEL_LOAD_DURATION
 
 _groq_client = None
@@ -31,9 +31,9 @@ def get_groq_client():
 
         # Metrics (non-blocking safe pattern)
         try:
-            MODEL_LOADED.labels(model="llama-3.3-70b-versatile").set(1)
+            MODEL_LOADED.labels(model=settings.GROQ_MODEL).set(1)
             MODEL_LOAD_DURATION.labels(
-                model="llama-3.3-70b-versatile"
+                model=settings.GROQ_MODEL
             ).observe(time.time() - start_time)
         except Exception:
             # metrics failure should NEVER break app
