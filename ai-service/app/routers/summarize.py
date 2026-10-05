@@ -1,5 +1,6 @@
 import time
 from app.services.summarize_service import summarize_text
+from app.config import settings
 from app.services.logger import log_request
 from app.dependencies import verify_internal_key
 from app.dependencies import GroqClient, InternalAuth
@@ -52,7 +53,7 @@ def summarize(
         )
 
         degraded = False
-        model_name = "llama-3.3-70b-versatile"
+        model_name = settings.GROQ_MODEL
         summary_text = result
         cached = False
 
